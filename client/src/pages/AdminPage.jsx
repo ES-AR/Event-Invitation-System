@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { api } from '../api';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-
 function Pill({ children, tone = 'info' }) {
   const colors = {
     info: 'bg-gray-100 text-secondary',
@@ -28,11 +26,16 @@ export default function AdminPage() {
   }, [registrations, filter]);
 
   const loadData = async () => {
-    const ev = await api.get('/event');
-    setEvent(ev.data.event);
-    setStats(ev.data.stats);
-    const reg = await api.get('/registrations');
-    setRegistrations(reg.data);
+    try {
+      const ev = await api.get('/event');
+      setEvent(ev.data.event);
+      setStats(ev.data.stats);
+      const reg = await api.get('/registrations');
+      setRegistrations(reg.data);
+      setMessage('');
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to load admin data. Check admin key.');
+    }
   };
 
   useEffect(() => {
@@ -75,28 +78,52 @@ export default function AdminPage() {
   };
 
   const approveSingle = async (id) => {
-    await api.post(`/registrations/${id}/approve`);
-    await loadData();
+    try {
+      await api.post(`/registrations/${id}/approve`);
+      await loadData();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to approve.');
+    }
   };
 
   const copyCheckIn = async (id) => {
-    const res = await api.get(`/registrations/${id}/checkin-link`);
-    const link = res.data.link;
-    if (navigator.clipboard && link) {
-      await navigator.clipboard.writeText(link);
-      setMessage('Check-in link copied to clipboard.');
-    } else {
-      setMessage(link);
+    try {
+      const res = await api.get(`/registrations/${id}/checkin-link`);
+      const link = res.data.link;
+      if (navigator.clipboard && link) {
+        await navigator.clipboard.writeText(link);
+        setMessage('Check-in link copied to clipboard.');
+      } else {
+        setMessage(link);
+      }
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to create check-in link.');
     }
   };
 
   const removeSingle = async (id) => {
-    await api.delete(`/registrations/${id}`);
-    await loadData();
+    try {
+      await api.delete(`/registrations/${id}`);
+      await loadData();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Unable to delete registration.');
+    }
   };
 
-  const exportCsv = (status = 'approved') => {
-    window.open(`${API_BASE}/export?status=${status}`, '_blank');
+  const exportCsv = async (status = 'approved') => {
+    try {
+      const res = await api.get(`/export?status=${status}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `registrations-${status}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Export failed.');
+    }
   };
 
   const toggleClosed = () => updateEvent({ isClosed: !event?.isClosed });

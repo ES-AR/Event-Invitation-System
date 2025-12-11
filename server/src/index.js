@@ -20,6 +20,10 @@ mongoose.set('strictQuery', true);
 const app = express();
 const PORT = process.env.PORT || 4000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const ADMIN_KEY = process.env.ADMIN_KEY || 'dev-admin-key';
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : [FRONTEND_URL];
 
 const uploadDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -35,12 +39,17 @@ const upload = multer({
   }
 });
 
-app.use(cors());
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true
+  })
+);
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(helmet());
 app.use(morgan('dev'));
-app.use('/uploads', express.static(uploadDir));
+app.use('/uploads', requireAdmin, express.static(uploadDir));
 
 const registerLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -52,6 +61,14 @@ const checkInLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   message: 'Too many check-in attempts. Please slow down.'
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many admin requests. Please slow down.'
 });
 
 const captchaStore = new Map();
@@ -94,6 +111,15 @@ function buildDefaultEvent() {
     createdAt: new Date(),
     updatedAt: new Date()
   };
+}
+
+function requireAdmin(req, res, next) {
+  if (!ADMIN_KEY) return next();
+  const key = req.headers['x-admin-key'];
+  if (key !== ADMIN_KEY) {
+    return res.status(401).json({ message: 'Admin key missing or invalid' });
+  }
+  next();
 }
 
 async function connectDatabase() {
@@ -171,9 +197,25 @@ app.get('/api/event', async (_req, res) => {
   }
 });
 
-app.post('/api/event', async (req, res) => {
+app.post('/api/event', requireAdmin, adminLimiter, async (req, res) => {
   try {
     const event = await ensureEvent();
+    const numericFields = ['maxMainSlots', 'overflowSlots'];
+    for (const field of numericFields) {
+      if (req.body[field] !== undefined) {
+        const value = Number(req.body[field]);
+        if (!Number.isFinite(value) || value < 0) {
+          return res.status(400).json({ message: `${field} must be a non-negative number` });
+        }
+      }
+    }
+    if (req.body.registrationClosesAt) {
+      const closesAt = new Date(req.body.registrationClosesAt);
+      if (Number.isNaN(closesAt.getTime())) {
+        return res.status(400).json({ message: 'registrationClosesAt must be a valid date' });
+      }
+      req.body.registrationClosesAt = closesAt;
+    }
     const updates = ['title', 'description', 'location', 'maxMainSlots', 'overflowSlots', 'allowOverflow', 'registrationClosesAt', 'isClosed', 'banner'];
     updates.forEach((field) => {
       if (req.body[field] !== undefined) {
@@ -257,7 +299,7 @@ app.post('/api/register', registerLimiter, async (req, res) => {
   }
 });
 
-app.get('/api/registrations', async (req, res) => {
+app.get('/api/registrations', requireAdmin, adminLimiter, async (req, res) => {
   try {
     const query = {};
     if (req.query.status) query.status = req.query.status;
@@ -272,7 +314,7 @@ app.get('/api/registrations', async (req, res) => {
   }
 });
 
-app.post('/api/registrations/:id/approve', async (req, res) => {
+app.post('/api/registrations/:id/approve', requireAdmin, adminLimiter, async (req, res) => {
   try {
     if (useMemoryStore) {
       const registration = memoryStore.registrations.find((r) => r._id === req.params.id);
@@ -297,7 +339,7 @@ app.post('/api/registrations/:id/approve', async (req, res) => {
   }
 });
 
-app.delete('/api/registrations/:id', async (req, res) => {
+app.delete('/api/registrations/:id', requireAdmin, adminLimiter, async (req, res) => {
   try {
     if (useMemoryStore) {
       const registration = memoryStore.registrations.find((r) => r._id === req.params.id);
@@ -316,7 +358,7 @@ app.delete('/api/registrations/:id', async (req, res) => {
   }
 });
 
-app.post('/api/registrations/bulk', async (req, res) => {
+app.post('/api/registrations/bulk', requireAdmin, adminLimiter, async (req, res) => {
   try {
     const { ids = [], action } = req.body;
     if (!ids.length || !action) return res.status(400).json({ message: 'ids and action are required' });
@@ -359,7 +401,7 @@ app.post('/api/registrations/bulk', async (req, res) => {
   }
 });
 
-app.get('/api/registrations/:id/checkin-link', async (req, res) => {
+app.get('/api/registrations/:id/checkin-link', requireAdmin, adminLimiter, async (req, res) => {
   try {
     const registration = useMemoryStore
       ? memoryStore.registrations.find((r) => r._id === req.params.id)
@@ -405,7 +447,7 @@ app.post('/api/checkin', checkInLimiter, upload.single('photo'), async (req, res
   }
 });
 
-app.get('/api/export', async (req, res) => {
+app.get('/api/export', requireAdmin, adminLimiter, async (req, res) => {
   try {
     const status = req.query.status || 'approved';
     const registrations = useMemoryStore
