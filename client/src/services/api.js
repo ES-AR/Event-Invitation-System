@@ -1,14 +1,28 @@
-import axios from 'axios';
+// api.js
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-const ADMIN_KEY = import.meta.env.VITE_ADMIN_KEY || 'dev-admin-key';
+export async function apiRequest(endpoint, method = "GET", body = null, headers = {}) {
+  const config = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...headers,
+    },
+  };
 
-export const api = axios.create({
-  baseURL: API_BASE,
-  headers: ADMIN_KEY ? { 'x-admin-key': ADMIN_KEY } : undefined
-});
+  if (body) config.body = JSON.stringify(body);
 
-export const uploadClient = axios.create({
-  baseURL: API_BASE,
-  headers: { 'Content-Type': 'multipart/form-data', ...(ADMIN_KEY ? { 'x-admin-key': ADMIN_KEY } : {}) }
-});
+  try {
+    const response = await fetch(`${BASE_URL}${endpoint}`, config);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Request failed");
+    }
+
+    return data;
+  } catch (error) {
+    console.error(`API Error (${endpoint}):`, error.message);
+    throw error;
+  }
+}
