@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import cors from "cors";
+import { MongoMemoryServer } from "mongodb-memory-server";
 
 // Route imports
 import eventRoutes from "./routes/event.routes.js";
@@ -26,18 +27,49 @@ app.get("/", (req, res) => {
   res.send("Quota-Controlled Event System API is running...");
 });
 
-// MongoDB connection
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("MongoDB connected");
+const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/event_invitation";
+let memoryServer;
 
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () =>
-      console.log(`Server running on http://localhost:${PORT}`)
+async function connectDatabase() {
+  try {
+    await mongoose.connect(MONGO_URI);
+    console.log("MongoDB connected");
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("Database connection failed:", err.message);
+      process.exit(1);
+    }
+
+    console.warn(
+      "Mongo connection failed (", err.message,
+      "). Falling back to in-memory MongoDB for development."
     );
-  })
-  .catch((err) => {
-    console.error("Database connection failed:", err.message);
-    process.exit(1);
-  });
+
+    memoryServer = await MongoMemoryServer.create();
+    const memoryUri = memoryServer.getUri();
+    await mongoose.connect(memoryUri);
+    console.log("MongoDB connected (in-memory)");
+  }
+}
+
+async function start() {
+  await connectDatabase();
+
+  const PORT = process.env.PORT || 5000;
+  const server = app.listen(PORT, () =>
+    console.log(`Server running on http://localhost:${PORT}`)
+  );
+
+  const shutdown = async () => {
+    await mongoose.disconnect();
+    if (memoryServer) {
+      await memoryServer.stop();
+    }
+    server.close(() => process.exit(0));
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
+
+start();

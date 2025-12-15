@@ -19,18 +19,17 @@ A MERN-based, quota-controlled event invitation and attendance platform with mai
 ## Running Locally
 1) **Backend**
 ```bash
-cd /home/runner/work/Event-Invitation-System/Event-Invitation-System/server
-cp .env.example .env   # update MONGO_URI if needed
-# set ADMIN_KEY for admin routes
+cd server
+cp .env.example .env   # update MONGO_URI, ADMIN_KEY, FRONTEND_URL
 npm install
 npm run dev            # or npm start
 ```
 
 2) **Frontend**
 ```bash
-cd /home/runner/work/Event-Invitation-System/Event-Invitation-System/client
+cd client
+cp .env.example .env   # ensure VITE_API_BASE_URL + VITE_ADMIN_KEY match backend
 npm install
-# create .env and set VITE_API_URL and VITE_ADMIN_KEY to match backend
 npm run dev            # starts Vite on 5173
 ```
 Set `VITE_API_URL` in `client/.env` if your API is not on `http://localhost:4000/api`.
