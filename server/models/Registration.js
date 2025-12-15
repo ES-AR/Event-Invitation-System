@@ -2,27 +2,34 @@ import mongoose from "mongoose";
 
 const registrationSchema = new mongoose.Schema(
   {
-    fullName: { type: String, required: true },
-    email: { type: String, required: true },
-    phone: { type: String },
+    event: { type: mongoose.Schema.Types.ObjectId, ref: "Event", required: true },
+    fullName: { type: String, required: true, trim: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
+    phone: { type: String, default: "" },
+    organization: { type: String, default: "" },
+    note: { type: String, default: "" },
 
-    // reference to event
-    eventId: { type: mongoose.Schema.Types.ObjectId, ref: "Event", required: true },
-
-    // Status: registered, checked-in, cancelled
-    status: {
+    slotType: {
       type: String,
-      enum: ["registered", "checked-in", "cancelled"],
-      default: "registered",
+      enum: ["main", "overflow"],
+      default: "main",
     },
 
-    // Admin can approve registrations if needed
-    isApproved: { type: Boolean, default: true },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected", "checked-in", "cancelled"],
+      default: "pending",
+    },
 
-    // For check-in timestamp
+    isApproved: { type: Boolean, default: false },
+    checkedIn: { type: Boolean, default: false },
+    checkInToken: { type: String, default: null },
+    checkInPhoto: { type: String, default: null },
     checkInTime: { type: Date, default: null },
   },
   { timestamps: true }
 );
+
+registrationSchema.index({ email: 1, event: 1 }, { unique: true });
 
 export default mongoose.model("Registration", registrationSchema);

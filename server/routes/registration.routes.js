@@ -2,19 +2,23 @@
 import express from "express";
 import {
   registerUser,
-  checkInAttendee,
+  listAttendees,
+  approveAttendee,
+  deleteAttendee,
+  sendCheckInLink,
   getSingleAttendee,
+  checkInAttendee,
 } from "../controllers/registration.controller.js";
+import requireAdmin from "../middleware/requireAdmin.js";
 
 const router = express.Router();
 
-// Public → register attendee
 router.post("/", registerUser);
-
-// Public → load details for check-in via email link
-router.get("/:regId", getSingleAttendee);
-
-// Public → submit check‑in form
-router.post("/:regId/checkin", checkInAttendee);
+router.get("/list", requireAdmin, listAttendees);
+router.put("/approve/:id", requireAdmin, approveAttendee);
+router.delete("/:id", requireAdmin, deleteAttendee);
+router.post("/send-checkin/:id", requireAdmin, sendCheckInLink);
+router.post("/checkin/:token", checkInAttendee);
+router.get("/:id", requireAdmin, getSingleAttendee);
 
 export default router;
