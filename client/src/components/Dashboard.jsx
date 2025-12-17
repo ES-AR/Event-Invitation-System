@@ -1,0 +1,1 @@
+// File moved to src/pages/admin/Dashboard.jsx

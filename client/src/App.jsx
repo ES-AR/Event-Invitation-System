@@ -1,41 +1,74 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import PublicLayout from "./layouts/PublicLayout";
-import AdminLayout from "./layouts/AdminLayout";
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import Sidebar from './components/Sidebar';
+import Header from './components/Header';
+import Dashboard from './pages/admin/Dashboard';
+import Login from './pages/public/Login';
+import Register from './pages/public/Register';
+import Home from './pages/public/Home';
 
-// Public pages
-import Register from "./pages/public/Register";
-import CheckIn from "./pages/public/CheckIn";
-import RegistrationClosed from "./pages/public/RegistrationClosed";
+// Layout component for Authenticated Users
+const AdminLayout = ({ children }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-// Admin pages
-import Dashboard from "./pages/admin/Dashboard";
-import Attendees from "./pages/admin/Attendees";
-import EventSettings from "./pages/admin/EventSettings";
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
 
-// Fallback
-import NotFound from "./pages/NotFound";
-
-export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* PUBLIC ROUTES */}
-        <Route element={<PublicLayout />}>
-          <Route path="/" element={<Register />} />
-          <Route path="/check-in" element={<CheckIn />} />
-          <Route path="/closed" element={<RegistrationClosed />} />
-        </Route>
-
-        {/* ADMIN ROUTES */}
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="attendees" element={<Attendees />} />
-          <Route path="settings" element={<EventSettings />} />
-        </Route>
-
-        {/* NOT FOUND */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+    <div className="flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display">
+      <Sidebar 
+        isMobileOpen={isMobileMenuOpen} 
+        onClose={() => setIsMobileMenuOpen(false)} 
+      />
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        <Header onMenuClick={toggleMobileMenu} />
+        <main className="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark p-6 md:p-10 scroll-smooth">
+          {children}
+        </main>
+      </div>
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+    </div>
   );
-}
+};
+
+// Protected Route Component
+const RequireAuth = ({ children }) => {
+  const userInfo = localStorage.getItem('userInfo');
+  const location = useLocation();
+
+  if (!userInfo) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return <AdminLayout>{children}</AdminLayout>;
+};
+
+const App = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        
+        {/* Protected Admin Routes */}
+        <Route 
+          path="/dashboard" 
+          element={
+            <RequireAuth>
+              <Dashboard />
+            </RequireAuth>
+          } 
+        />
+      </Routes>
+    </Router>
+  );
+};
+
+export default App;
