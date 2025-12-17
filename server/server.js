@@ -2,23 +2,43 @@ import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import cookieParser from "cookie-parser";
+import path from "path";
+import { fileURLToPath } from "url";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
 // Route imports
 import eventRoutes from "./routes/event.routes.js";
 import registrationRoutes from "./routes/registration.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import { seedDefaultAdmin } from "./utils/seedAdmin.js";
 
 // Load env
 dotenv.config();
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Middlewares
-app.use(cors());
+const FRONTEND_ORIGIN = process.env.FRONTEND_URL || "http://localhost:5173";
+app.use(
+  cors({
+    origin: FRONTEND_ORIGIN,
+    credentials: true,
+  })
+);
+app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" })); // allow photo uploads
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Routes
+app.use("/api/auth", authRoutes);
 app.use("/api/event", eventRoutes);
 app.use("/api/registration", registrationRoutes);
 
@@ -54,6 +74,7 @@ async function connectDatabase() {
 
 async function start() {
   await connectDatabase();
+  await seedDefaultAdmin();
 
   const PORT = process.env.PORT || 5000;
   const server = app.listen(PORT, () =>

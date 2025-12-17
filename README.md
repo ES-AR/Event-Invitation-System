@@ -20,7 +20,7 @@ A MERN-based, quota-controlled event invitation and attendance platform with mai
 1) **Backend**
 ```bash
 cd server
-cp .env.example .env   # update MONGO_URI, ADMIN_KEY, FRONTEND_URL
+cp .env.example .env   # update MONGO_URI, ADMIN_KEY, FRONTEND_URL, DEFAULT_EVENT_SLUG
 npm install
 npm run dev            # or npm start
 ```
@@ -28,7 +28,7 @@ npm run dev            # or npm start
 2) **Frontend**
 ```bash
 cd client
-cp .env.example .env   # ensure VITE_API_BASE_URL + VITE_ADMIN_KEY match backend
+cp .env.example .env   # ensure VITE_API_BASE_URL + VITE_ADMIN_KEY + VITE_DEFAULT_EVENT_SLUG are set
 npm install
 npm run dev            # starts Vite on 5173
 ```

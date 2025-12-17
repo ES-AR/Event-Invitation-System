@@ -1,74 +1,44 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
-import Dashboard from './pages/admin/Dashboard';
-import Login from './pages/public/Login';
-import Register from './pages/public/Register';
-import Home from './pages/public/Home';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, RequireAdmin } from "./hooks/useAuth";
+import PublicShell from "./components/layout/PublicShell";
+import AdminShell from "./components/layout/AdminShell";
+import LandingPage from "./features/public/LandingPage";
+import RegistrationPage from "./features/public/RegistrationPage";
+import CheckInPage from "./features/public/CheckInPage";
+import OrganizerLogin from "./features/auth/OrganizerLogin";
+import DashboardPage from "./features/admin/DashboardPage";
+import RegistrationsPage from "./features/admin/RegistrationsPage";
+import EventBuilderPage from "./features/admin/EventBuilderPage";
 
-// Layout component for Authenticated Users
-const AdminLayout = ({ children }) => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
+export default function App() {
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display">
-      <Sidebar 
-        isMobileOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
-      />
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <Header onMenuClick={toggleMobileMenu} />
-        <main className="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark p-6 md:p-10 scroll-smooth">
-          {children}
-        </main>
-      </div>
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-20 md:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-    </div>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<PublicShell />}>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/invite/:slug" element={<RegistrationPage />} />
+            <Route path="/check-in" element={<CheckInPage />} />
+          </Route>
+
+          <Route path="/admin/login" element={<OrganizerLogin />} />
+
+          <Route
+            path="/admin"
+            element={
+              <RequireAdmin>
+                <AdminShell />
+              </RequireAdmin>
+            }
+          >
+            <Route index element={<DashboardPage />} />
+            <Route path="attendees" element={<RegistrationsPage />} />
+            <Route path="events" element={<EventBuilderPage />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
-};
-
-// Protected Route Component
-const RequireAuth = ({ children }) => {
-  const userInfo = localStorage.getItem('userInfo');
-  const location = useLocation();
-
-  if (!userInfo) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  return <AdminLayout>{children}</AdminLayout>;
-};
-
-const App = () => {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        
-        {/* Protected Admin Routes */}
-        <Route 
-          path="/dashboard" 
-          element={
-            <RequireAuth>
-              <Dashboard />
-            </RequireAuth>
-          } 
-        />
-      </Routes>
-    </Router>
-  );
-};
-
-export default App;
+}
