@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Input from "../../components/ui/Input";
+import { BadgeCheck, Mail, Phone, ShieldCheck, UploadCloud, UserRound } from "lucide-react";
 import { getCheckInDetails, submitCheckIn } from "../../services/registration.service";
 
 const FILE_HOST = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api").replace(/\/api$/, "");
@@ -106,7 +107,9 @@ export default function CheckInPage() {
     return (
       <div className="mx-auto max-w-2xl px-6 py-16">
         <Card className="text-center">
-          <p className="text-xs uppercase tracking-[0.35em] text-success">Verified</p>
+          <p className="flex items-center justify-center gap-2 text-xs uppercase tracking-[0.35em] text-success">
+            <BadgeCheck className="h-4 w-4" strokeWidth={1.8} /> Verified
+          </p>
           <h2 className="mt-4 font-display text-3xl text-slate-900">Check-in complete</h2>
           <p className="mt-2 text-slate-500">{success.message}</p>
           {success.attendee?.checkInPhoto && (
@@ -141,16 +144,40 @@ export default function CheckInPage() {
         </div>
         <form onSubmit={handleSubmit} className="mt-8 grid gap-6">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Full name" value={form.fullName} onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))} required />
-            <Input label="Phone" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+1 (555) 000-0000" />
-            <Input label="Email" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} required />
+            <Input
+              label="Full name"
+              icon={<UserRound className="h-4 w-4" strokeWidth={1.8} />}
+              value={form.fullName}
+              onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))}
+              required
+            />
+            <Input
+              label="Phone"
+              icon={<Phone className="h-4 w-4" strokeWidth={1.8} />}
+              value={form.phone}
+              onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+              placeholder="+1 (555) 000-0000"
+            />
+            <Input
+              label="Email"
+              type="email"
+              icon={<Mail className="h-4 w-4" strokeWidth={1.8} />}
+              value={form.email}
+              onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+              required
+            />
           </div>
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 text-center">
-            <p className="font-semibold text-slate-800">Photo ID Upload</p>
+            <p className="flex items-center justify-center gap-2 font-semibold text-slate-800">
+              <UploadCloud className="h-4 w-4 text-primary-500" strokeWidth={1.8} /> Photo ID Upload
+            </p>
             <p className="mt-2 text-sm text-slate-500">Click to upload or drag and drop. PNG/JPG up to 5MB.</p>
             <input type="file" accept="image/*" className="hidden" id="photo-input" onChange={(e) => handleFile(e.target.files?.[0])} />
-            <label htmlFor="photo-input" className="mt-4 inline-flex cursor-pointer rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-primary-600">
-              {photo ? "Replace photo" : "Upload photo"}
+            <label
+              htmlFor="photo-input"
+              className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-primary-600"
+            >
+              <UploadCloud className="h-4 w-4" strokeWidth={1.8} /> {photo ? "Replace photo" : "Upload photo"}
             </label>
             {preview && <img src={preview} alt="Preview" className="mx-auto mt-4 h-48 w-48 rounded-2xl object-cover" />}
           </div>
@@ -158,10 +185,7 @@ export default function CheckInPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
             <span>Status: {statusLabel}</span>
             <span className="flex items-center gap-1 text-emerald-600">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 12l5 5L20 6" />
-              </svg>
-              SSL encrypted
+              <ShieldCheck className="h-4 w-4" strokeWidth={1.8} /> SSL encrypted
             </span>
           </div>
           <Button type="submit" disabled={submitting} className="justify-center">

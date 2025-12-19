@@ -1,4 +1,5 @@
 import { Outlet, Link } from "react-router-dom";
+import { TicketCheck } from "lucide-react";
 
 export default function PublicShell() {
   return (
@@ -6,16 +7,7 @@ export default function PublicShell() {
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-6">
         <Link to="/" className="flex items-center gap-3">
           <div className="rounded-2xl bg-primary-500/10 p-2 text-primary-500">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="4" width="18" height="16" rx="5" fill="currentColor" opacity="0.15" />
-              <path
-                d="M7 9h10M7 13h5"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <TicketCheck className="h-7 w-7" strokeWidth={1.6} />
           </div>
           <div className="leading-tight">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-600">EventHub</p>

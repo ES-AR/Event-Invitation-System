@@ -8,6 +8,14 @@ export async function loginAdmin(credentials) {
   return payload;
 }
 
+export async function registerAdmin(data) {
+  const payload = await apiClient("/auth/register", {
+    method: "POST",
+    data,
+  });
+  return payload;
+}
+
 export async function fetchProfile(token) {
   const { admin } = await apiClient("/auth/me", {
     token,

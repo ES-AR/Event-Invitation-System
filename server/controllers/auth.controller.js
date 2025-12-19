@@ -58,3 +58,47 @@ export const getCurrentAdmin = async (req, res) => {
 
   res.json({ admin: serializeAdmin(req.admin) });
 };
+
+export const registerAdmin = async (req, res) => {
+  try {
+    const { accessKey, email, password, displayName } = req.body || {};
+
+    if (!process.env.ADMIN_KEY) {
+      return res.status(500).json({ message: "Admin registration is not configured" });
+    }
+
+    if (!accessKey || accessKey !== process.env.ADMIN_KEY) {
+      return res.status(403).json({ message: "Invalid organizer access key" });
+    }
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await Admin.findOne({ email: normalizedEmail });
+    if (existing) {
+      return res.status(409).json({ message: "An organizer with this email already exists" });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const admin = await Admin.create({
+      email: normalizedEmail,
+      passwordHash,
+      displayName: (displayName || "").trim() || normalizedEmail.split("@")[0],
+    });
+
+    const token = jwt.sign({ sub: admin._id.toString(), role: admin.role }, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
+
+    res.status(201).json({
+      message: "Organizer account created",
+      token,
+      admin: serializeAdmin(admin),
+    });
+  } catch (error) {
+    console.error("Error registering admin", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};

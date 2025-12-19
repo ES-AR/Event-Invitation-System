@@ -16,20 +16,41 @@ export function normalizeSlug(value = DEFAULT_EVENT_SLUG) {
   return cleaned;
 }
 
-export async function ensureEventDocument() {
-  let event = await Event.findOne();
+function notFoundError() {
+  const error = new Error("Event not found");
+  error.statusCode = 404;
+  return error;
+}
 
-  if (!event) {
-    event = await Event.create({
-      title: "Quota-Controlled Event",
-      description: "",
-      location: "",
-      publicSlug: DEFAULT_EVENT_SLUG,
-    });
-  } else if (!event.publicSlug) {
-    event.publicSlug = DEFAULT_EVENT_SLUG;
-    await event.save();
+export async function requireOrganizerEvent(adminId, eventId) {
+  if (!adminId) {
+    const error = new Error("Organizer context is missing");
+    error.statusCode = 401;
+    throw error;
   }
 
+  if (!eventId) {
+    const error = new Error("Event id is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const event = await Event.findOne({ _id: eventId, organizer: adminId });
+  if (!event) {
+    throw notFoundError();
+  }
   return event;
+}
+
+export async function generateUniqueSlug(preferred, excludeId) {
+  const base = normalizeSlug(preferred);
+  let slug = base;
+  let attempt = 1;
+  const filter = excludeId ? { _id: { $ne: excludeId } } : {};
+
+  while (await Event.exists({ publicSlug: slug, ...filter })) {
+    slug = `${base}-${attempt++}`;
+  }
+
+  return slug;
 }

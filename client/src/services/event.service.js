@@ -5,28 +5,47 @@ export function getPublicEvent(slug) {
   return apiClient(`/event/public/${targetSlug}`);
 }
 
-export function getEventStats(token) {
-  return apiClient("/event/stats", { token });
+export function listEvents(token) {
+  return apiClient("/event", { token });
 }
 
-export function getEventSettings(token) {
-  return apiClient("/event/settings", { token });
+export function createEvent(token, payload) {
+  return apiClient("/event", {
+    method: "POST",
+    token,
+    data: payload,
+  });
 }
 
-export function updateEventSettings(token, updates) {
-  return apiClient("/event/settings", {
+export function getEvent(eventId, token) {
+  return apiClient(`/event/${eventId}`, { token });
+}
+
+export function updateEvent(eventId, token, updates) {
+  return apiClient(`/event/${eventId}`, {
     method: "PUT",
     token,
     data: updates,
   });
 }
 
-export function openRegistration(token) {
-  return apiClient("/event/open", { method: "POST", token });
+export function deleteEvent(eventId, token) {
+  return apiClient(`/event/${eventId}`, {
+    method: "DELETE",
+    token,
+  });
 }
 
-export function closeRegistration(token, reason) {
-  return apiClient("/event/close", {
+export function getEventStats(eventId, token) {
+  return apiClient(`/event/${eventId}/stats`, { token });
+}
+
+export function openRegistration(eventId, token) {
+  return apiClient(`/event/${eventId}/open`, { method: "POST", token });
+}
+
+export function closeRegistration(eventId, token, reason) {
+  return apiClient(`/event/${eventId}/close`, {
     method: "POST",
     token,
     data: { reason },

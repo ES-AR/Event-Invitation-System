@@ -84,7 +84,8 @@ export default function OrganizerLogin() {
             {submitting ? "Signing in..." : "Log In"}
           </Button>
           <p className="text-sm text-slate-500">
-            Need an organizer seat? <Link to="/" className="text-primary-600">Contact support</Link>
+            Need an organizer seat? <Link to="/admin/register" className="text-primary-600">Request access</Link>
+            {" "}or <Link to="/" className="text-primary-600">contact support</Link>.
           </p>
         </form>
       </section>

@@ -4,7 +4,7 @@ import { Parser } from "json2csv";
 import PDFDocument from "pdfkit";
 import Registration from "../models/Registration.js";
 import Event from "../models/Event.js";
-import { ensureEventDocument, normalizeSlug } from "../utils/eventSetup.js";
+import { normalizeSlug, requireOrganizerEvent } from "../utils/eventSetup.js";
 import { applyAutoClose } from "../utils/eventStatus.js";
 import { sendCheckInEmail } from "../services/email.service.js";
 import {
@@ -52,15 +52,13 @@ export const getCaptchaChallenge = (req, res) => {
 export const registerUser = async (req, res) => {
   try {
     const slug = req.body.slug ? normalizeSlug(req.body.slug) : null;
-    let event;
+    if (!slug) {
+      return res.status(400).json({ message: "Missing event invite" });
+    }
 
-    if (slug) {
-      event = await Event.findOne({ publicSlug: slug });
-      if (!event) {
-        return res.status(404).json({ message: "Event not found" });
-      }
-    } else {
-      event = await ensureEventDocument();
+    const event = await Event.findOne({ publicSlug: slug });
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
     }
 
     await applyAutoClose(event);
@@ -177,7 +175,8 @@ export const registerUser = async (req, res) => {
 
 export const listAttendees = async (req, res) => {
   try {
-    const event = await ensureEventDocument();
+    const { eventId } = req.query;
+    const event = await requireOrganizerEvent(req.admin._id, eventId);
     const filter = { event: event._id };
 
     if (req.query.status) {
@@ -224,15 +223,16 @@ export const listAttendees = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ message: err.message });
   }
 };
 
 export const getSingleAttendee = async (req, res) => {
   try {
-    const attendee = await Registration.findById(req.params.id);
+    const attendee = await Registration.findById(req.params.id).populate("event", "organizer");
 
-    if (!attendee) {
+    if (!attendee || !attendee.event || String(attendee.event.organizer) !== String(req.admin._id)) {
       return res.status(404).json({ message: "Attendee not found" });
     }
 
@@ -244,9 +244,9 @@ export const getSingleAttendee = async (req, res) => {
 
 export const approveAttendee = async (req, res) => {
   try {
-    const attendee = await Registration.findById(req.params.id);
+    const attendee = await Registration.findById(req.params.id).populate("event", "organizer");
 
-    if (!attendee) {
+    if (!attendee || !attendee.event || String(attendee.event.organizer) !== String(req.admin._id)) {
       return res.status(404).json({ message: "Attendee not found" });
     }
 
@@ -268,11 +268,13 @@ export const approveAttendee = async (req, res) => {
 
 export const deleteAttendee = async (req, res) => {
   try {
-    const deleted = await Registration.findByIdAndDelete(req.params.id);
+    const attendee = await Registration.findById(req.params.id).populate("event", "organizer");
 
-    if (!deleted) {
+    if (!attendee || !attendee.event || String(attendee.event.organizer) !== String(req.admin._id)) {
       return res.status(404).json({ message: "Attendee not found" });
     }
+
+    await attendee.deleteOne();
 
     res.json({ message: "Attendee removed" });
   } catch (err) {
@@ -282,9 +284,9 @@ export const deleteAttendee = async (req, res) => {
 
 export const sendCheckInLink = async (req, res) => {
   try {
-    const attendee = await Registration.findById(req.params.id);
+    const attendee = await Registration.findById(req.params.id).populate("event", "organizer");
 
-    if (!attendee) {
+    if (!attendee || !attendee.event || String(attendee.event.organizer) !== String(req.admin._id)) {
       return res.status(404).json({ message: "Attendee not found" });
     }
 
@@ -414,12 +416,12 @@ export const checkInAttendee = async (req, res) => {
 
 export const bulkApproveAttendees = async (req, res) => {
   try {
-    const { ids = [], sendEmails = false } = req.body;
+    const { ids = [], sendEmails = false, eventId } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ message: "Provide attendee ids" });
     }
 
-    const event = await ensureEventDocument();
+    const event = await requireOrganizerEvent(req.admin._id, eventId);
     const attendees = await Registration.find({
       _id: { $in: ids },
       event: event._id,
@@ -456,18 +458,19 @@ export const bulkApproveAttendees = async (req, res) => {
       results,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ message: err.message });
   }
 };
 
 export const bulkDeleteAttendees = async (req, res) => {
   try {
-    const { ids = [] } = req.body;
+    const { ids = [], eventId } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ message: "Provide attendee ids" });
     }
 
-    const event = await ensureEventDocument();
+    const event = await requireOrganizerEvent(req.admin._id, eventId);
     const result = await Registration.deleteMany({
       _id: { $in: ids },
       event: event._id,
@@ -478,12 +481,13 @@ export const bulkDeleteAttendees = async (req, res) => {
       deleted: result.deletedCount,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ message: err.message });
   }
 };
 
 const buildExportFilter = async (req) => {
-  const event = await ensureEventDocument();
+  const event = await requireOrganizerEvent(req.admin._id, req.query.eventId);
   const filter = { event: event._id };
   if (req.query.status) {
     filter.status = req.query.status;
@@ -516,7 +520,8 @@ export const exportAttendeesCsv = async (req, res) => {
     );
     res.send(csv);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ message: err.message });
   }
 };
 
@@ -548,6 +553,7 @@ export const exportAttendeesPdf = async (req, res) => {
 
     doc.end();
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ message: err.message });
   }
 };

@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import {
+  Activity,
+  Briefcase,
+  Building2,
+  CalendarClock,
+  CheckCircle2,
+  MapPin,
+  Mail,
+  Phone,
+  RefreshCw,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Badge from "../../components/ui/Badge";
@@ -20,6 +33,12 @@ const initialForm = {
   captchaAnswer: "",
   agree: false,
 };
+
+const trustPoints = [
+  "Tiered quotas and overflow lists keep commitments precise.",
+  "Instant duplicate detection prevents double-booking.",
+  "Integrated check-in photo audit for security teams.",
+];
 
 export default function RegistrationPage() {
   const { slug } = useParams();
@@ -141,18 +160,27 @@ export default function RegistrationPage() {
           <p className="mt-2 text-slate-500">{event?.description}</p>
           <div className="mt-6 grid gap-4">
             <div className="rounded-2xl border border-slate-100 p-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">When</p>
+              <div className="flex items-center gap-2 text-primary-600">
+                <CalendarClock className="h-4 w-4" strokeWidth={1.8} />
+                <p className="text-xs uppercase tracking-[0.3em] text-primary-600">When</p>
+              </div>
               <p className="mt-1 text-sm font-semibold text-slate-800">
                 {formatDateRange(event?.startDate, event?.endDate, event?.timezone)}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-100 p-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Where</p>
+              <div className="flex items-center gap-2 text-primary-600">
+                <MapPin className="h-4 w-4" strokeWidth={1.8} />
+                <p className="text-xs uppercase tracking-[0.3em] text-primary-600">Where</p>
+              </div>
               <p className="mt-1 text-sm font-semibold text-slate-800">{event?.venueName || event?.location}</p>
               <p className="text-xs text-slate-500">{event?.venueAddress}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 p-4">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Registration Status</p>
+              <div className="flex items-center gap-2 text-primary-600">
+                <Activity className="h-4 w-4" strokeWidth={1.8} />
+                <p className="text-xs uppercase tracking-[0.3em] text-primary-600">Registration Status</p>
+              </div>
               <div className="mt-2 flex items-center gap-3">
                 {tierPill}
                 <span className="text-sm text-slate-500">
@@ -169,9 +197,12 @@ export default function RegistrationPage() {
         <Card>
           <p className="text-sm font-semibold text-slate-800">Why organizers trust EventHub</p>
           <ul className="mt-4 space-y-3 text-sm text-slate-600">
-            <li>• Tiered quotas and overflow lists keep commitments precise.</li>
-            <li>• Instant duplicate detection prevents double-booking.</li>
-            <li>• Integrated check-in photo audit for security teams.</li>
+            {trustPoints.map((point) => (
+              <li key={point} className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary-500" strokeWidth={2} />
+                <span>{point}</span>
+              </li>
+            ))}
           </ul>
         </Card>
       </section>
@@ -182,23 +213,52 @@ export default function RegistrationPage() {
             <h2 className="mt-2 font-display text-2xl text-slate-900">Attendee Information</h2>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="First name" value={form.firstName} onChange={(e) => handleChange("firstName", e.target.value)} required />
-            <Input label="Last name" value={form.lastName} onChange={(e) => handleChange("lastName", e.target.value)} required />
+            <Input
+              label="First name"
+              icon={<UserRound className="h-4 w-4" strokeWidth={1.8} />}
+              value={form.firstName}
+              onChange={(e) => handleChange("firstName", e.target.value)}
+              required
+            />
+            <Input
+              label="Last name"
+              icon={<UserRound className="h-4 w-4" strokeWidth={1.8} />}
+              value={form.lastName}
+              onChange={(e) => handleChange("lastName", e.target.value)}
+              required
+            />
           </div>
           <Input
             label="Work email"
             type="email"
+            icon={<Mail className="h-4 w-4" strokeWidth={1.8} />}
             value={form.email}
             onChange={(e) => handleChange("email", e.target.value)}
             required
             hint="We’ll send confirmations here"
           />
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Phone" value={form.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="+1 (555) 000-0000" />
-            <Input label="Organization" value={form.organization} onChange={(e) => handleChange("organization", e.target.value)} />
+            <Input
+              label="Phone"
+              icon={<Phone className="h-4 w-4" strokeWidth={1.8} />}
+              value={form.phone}
+              onChange={(e) => handleChange("phone", e.target.value)}
+              placeholder="+1 (555) 000-0000"
+            />
+            <Input
+              label="Organization"
+              icon={<Building2 className="h-4 w-4" strokeWidth={1.8} />}
+              value={form.organization}
+              onChange={(e) => handleChange("organization", e.target.value)}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Job title" value={form.jobTitle} onChange={(e) => handleChange("jobTitle", e.target.value)} />
+            <Input
+              label="Job title"
+              icon={<Briefcase className="h-4 w-4" strokeWidth={1.8} />}
+              value={form.jobTitle}
+              onChange={(e) => handleChange("jobTitle", e.target.value)}
+            />
             <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
               Dietary preferences
               <select
@@ -224,19 +284,26 @@ export default function RegistrationPage() {
             />
           </label>
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm">
-            <p className="font-semibold text-slate-700">Security Check</p>
+            <p className="flex items-center gap-2 font-semibold text-slate-700">
+              <ShieldCheck className="h-4 w-4 text-primary-500" strokeWidth={1.8} /> Security Check
+            </p>
             <div className="mt-3 flex items-center gap-3">
               <span className="rounded-xl bg-white px-4 py-2 font-mono text-lg text-slate-900">{captcha?.prompt}</span>
               <Input
                 label="Your answer"
+                icon={<ShieldCheck className="h-4 w-4" strokeWidth={1.8} />}
                 value={form.captchaAnswer}
                 onChange={(e) => handleChange("captchaAnswer", e.target.value)}
                 className="flex-1"
                 required
               />
-              <button type="button" onClick={refreshCaptcha} className="text-sm font-semibold text-primary-600">
-                Refresh
-              </button>
+                <button
+                  type="button"
+                  onClick={refreshCaptcha}
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-primary-600"
+                >
+                  <RefreshCw className="h-4 w-4" strokeWidth={1.8} /> Refresh
+                </button>
             </div>
           </div>
           <label className="flex items-start gap-3 text-sm text-slate-600">

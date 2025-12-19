@@ -6,6 +6,7 @@ import LandingPage from "./features/public/LandingPage";
 import RegistrationPage from "./features/public/RegistrationPage";
 import CheckInPage from "./features/public/CheckInPage";
 import OrganizerLogin from "./features/auth/OrganizerLogin";
+import OrganizerRegister from "./features/auth/OrganizerRegister";
 import DashboardPage from "./features/admin/DashboardPage";
 import RegistrationsPage from "./features/admin/RegistrationsPage";
 import EventBuilderPage from "./features/admin/EventBuilderPage";
@@ -22,6 +23,7 @@ export default function App() {
           </Route>
 
           <Route path="/admin/login" element={<OrganizerLogin />} />
+          <Route path="/admin/register" element={<OrganizerRegister />} />
 
           <Route
             path="/admin"

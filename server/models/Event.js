@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const eventSchema = new mongoose.Schema(
   {
+    organizer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      required: true,
+    },
     title: { type: String, default: "Quota-Controlled Event" },
     description: { type: String, default: "" },
     location: { type: String, default: "" },
@@ -57,6 +62,7 @@ const eventSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+eventSchema.index({ organizer: 1, createdAt: -1 });
 eventSchema.index({ publicSlug: 1 }, { unique: true });
 
 export default mongoose.model("Event", eventSchema);
