@@ -9,6 +9,7 @@ import OrganizerLogin from "./features/auth/OrganizerLogin";
 import OrganizerRegister from "./features/auth/OrganizerRegister";
 import DashboardPage from "./features/admin/DashboardPage";
 import RegistrationsPage from "./features/admin/RegistrationsPage";
+import EventsManagerPage from "./features/admin/EventsManagerPage";
 import EventBuilderPage from "./features/admin/EventBuilderPage";
 
 export default function App() {
@@ -35,7 +36,8 @@ export default function App() {
           >
             <Route index element={<DashboardPage />} />
             <Route path="attendees" element={<RegistrationsPage />} />
-            <Route path="events" element={<EventBuilderPage />} />
+            <Route path="events" element={<EventsManagerPage />} />
+            <Route path="events/builder" element={<EventBuilderPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
@@ -9,10 +10,15 @@ export default function OrganizerLogin() {
   const [form, setForm] = useState({ email: "", password: "", remember: true });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
   };
 
   const handleSubmit = async (e) => {
@@ -57,13 +63,25 @@ export default function OrganizerLogin() {
             value={form.email}
             onChange={(e) => handleChange("email", e.target.value)}
             required
+            icon={<Mail className="h-4 w-4" strokeWidth={1.8} />}
           />
           <Input
             label="Password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             value={form.password}
             onChange={(e) => handleChange("password", e.target.value)}
             required
+            icon={<Lock className="h-4 w-4" strokeWidth={1.8} />}
+            rightSlot={
+              <button
+                type="button"
+                onClick={togglePasswordVisibility}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="inline-flex items-center justify-center text-slate-400 transition hover:text-slate-600"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" strokeWidth={1.8} /> : <Eye className="h-4 w-4" strokeWidth={1.8} />}
+              </button>
+            }
           />
           <div className="flex items-center justify-between text-sm text-slate-600">
             <label className="flex items-center gap-2">

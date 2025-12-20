@@ -135,7 +135,7 @@ export default function RegistrationsPage() {
           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">No events configured</p>
           <p className="mt-3 text-sm text-slate-500">Create an event first to start collecting registrations.</p>
           <div className="mt-4 flex justify-center">
-            <Button as="a" href="/admin/events">
+            <Button as="a" href="/admin/events/builder">
               Launch an event
             </Button>
           </div>

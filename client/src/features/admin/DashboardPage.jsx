@@ -107,14 +107,14 @@ export default function DashboardPage() {
           <p className="text-sm text-slate-500">Overview · {admin?.displayName}</p>
           <h1 className="font-display text-3xl text-slate-900">Craft unforgettable guest flows.</h1>
         </div>
-        <Button as={Link} to="/admin/events" className="px-6">
-          Manage events
+        <Button as={Link} to="/admin/events/builder" className="px-6">
+          Create event
         </Button>
       </div>
 
       {eventsLoading ? (
         <div className="flex min-h-[40vh] items-center justify-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-100 border-t-primary-500" />
+          <div className="spinner-ring" />
         </div>
       ) : showEmptyState ? (
         <Card className="flex flex-col gap-4 text-center">
@@ -124,7 +124,7 @@ export default function DashboardPage() {
             Spin up a branded landing link, define quotas, and start inviting guests in minutes.
           </p>
           <div className="flex justify-center">
-            <Button as={Link} to="/admin/events">
+            <Button as={Link} to="/admin/events/builder">
               Create an event
             </Button>
           </div>
@@ -157,7 +157,7 @@ export default function DashboardPage() {
               </Badge>
             </div>
             <div>
-              <p className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
+              <p className="pill-label">
                 <Link2 className="h-4 w-4 text-primary-600" strokeWidth={1.8} /> Share link
               </p>
               <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
@@ -196,7 +196,7 @@ export default function DashboardPage() {
             <Card className="space-y-6">
               {statsLoading ? (
                 <div className="flex min-h-[180px] items-center justify-center">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-100 border-t-primary-500" />
+                  <div className="spinner-ring-sm" />
                 </div>
               ) : (
                 <>
@@ -228,7 +228,7 @@ export default function DashboardPage() {
                   <h2 className="font-display text-xl text-slate-900">All links</h2>
                 </div>
                 <Button as={Link} to="/admin/events" size="sm" variant="secondary">
-                  Edit events
+                  Manage events
                 </Button>
               </div>
               <div className="space-y-4">

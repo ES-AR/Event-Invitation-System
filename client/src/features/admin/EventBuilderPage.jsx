@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarRange, Copy, FileText, Layers3, Link2, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Copy, FileText, Layers3, Link2, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
-import Badge from "../../components/ui/Badge";
 import { useAuth } from "../../hooks/useAuth";
 import {
   closeRegistration,
   createEvent,
   deleteEvent as deleteEventApi,
-  listEvents,
+  getEvent,
   openRegistration,
   updateEvent,
 } from "../../services/event.service";
-import { formatDateRange } from "../../utils/formatters";
 
 const defaultEvent = {
   title: "",
@@ -46,78 +45,73 @@ const hydrateForm = (event = defaultEvent) => ({
 
 export default function EventBuilderPage() {
   const { token } = useAuth();
-  const [events, setEvents] = useState([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(defaultEvent);
   const [mode, setMode] = useState("create");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [copyState, setCopyState] = useState(null);
+  const [loadingEvent, setLoadingEvent] = useState(false);
   const copyTimer = useRef(null);
-  const selectedIdRef = useRef(null);
+  const eventIdParam = searchParams.get("eventId");
 
   const inviteOrigin = typeof window !== "undefined" ? window.location.origin : "https://invite.local";
   const previewLink = form.shareUrl || `${inviteOrigin}/invite/${form.publicSlug || "your-slug"}`;
 
-  useEffect(() => {
-    selectedIdRef.current = selectedId;
-  }, [selectedId]);
 
-  const loadEvents = useCallback(async () => {
+  const loadEvent = useCallback(
+    async (eventId) => {
+      if (!token || !eventId) return;
+      setLoadingEvent(true);
+      try {
+        const response = await getEvent(eventId, token);
+        if (response?.event) {
+          setForm(hydrateForm(response.event));
+          setSelectedId(response.event.id);
+          setMode("edit");
+          setMessage("");
+        }
+      } catch (err) {
+        console.error("Unable to load event", err);
+      } finally {
+        setLoadingEvent(false);
+      }
+    },
+    [token]
+  );
+
+  useEffect(() => {
     if (!token) return;
-    setEventsLoading(true);
-    try {
-      const response = await listEvents(token);
-      const eventList = response.events || [];
-      setEvents(eventList);
-
-      if (eventList.length === 0) {
-        setMode("create");
-        setSelectedId(null);
-        setForm(defaultEvent);
-        return;
-      }
-
-      const fallbackId = eventList[0]?.id || null;
-      const desiredId = selectedIdRef.current;
-      const nextId = desiredId && eventList.find((evt) => evt.id === desiredId) ? desiredId : fallbackId;
-      setSelectedId(nextId);
-      setMode("edit");
-      const active = eventList.find((evt) => evt.id === nextId);
-      if (active) {
-        setForm(hydrateForm(active));
-      }
-    } catch (err) {
-      console.error("Unable to load events", err);
-    } finally {
-      setEventsLoading(false);
+    if (eventIdParam) {
+      loadEvent(eventIdParam);
+    } else {
+      setSelectedId(null);
+      setMode("create");
+      setForm(defaultEvent);
+      setMessage("");
     }
-  }, [token]);
+  }, [eventIdParam, loadEvent, token]);
 
-  useEffect(() => {
-    loadEvents();
-    return () => {
+  useEffect(
+    () => () => {
       if (copyTimer.current) {
         clearTimeout(copyTimer.current);
       }
-    };
-  }, [loadEvents]);
-
-  const handleSelectEvent = (eventId) => {
-    const event = events.find((evt) => evt.id === eventId);
-    if (!event) return;
-    setSelectedId(eventId);
-    setForm(hydrateForm(event));
-    setMode("edit");
-    setMessage("");
-  };
+    },
+    []
+  );
 
   const startCreateFlow = () => {
     setSelectedId(null);
     setMode("create");
     setForm(defaultEvent);
     setMessage("");
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      params.delete("eventId");
+      return params;
+    });
   };
 
   const handleChange = (key, value) => {
@@ -133,18 +127,6 @@ export default function EventBuilderPage() {
     };
   };
 
-  const upsertEventLocally = (event) => {
-    setEvents((prev) => {
-      const existingIndex = prev.findIndex((item) => item.id === event.id);
-      if (existingIndex >= 0) {
-        const next = [...prev];
-        next[existingIndex] = event;
-        return next;
-      }
-      return [event, ...prev];
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!token) return;
@@ -152,10 +134,10 @@ export default function EventBuilderPage() {
     setMessage("");
     try {
       const payload = buildPayload();
+      const wasCreating = mode === "create";
       let response;
-      if (mode === "create") {
+      if (wasCreating) {
         response = await createEvent(token, payload);
-        setMode("edit");
       } else if (selectedId) {
         response = await updateEvent(selectedId, token, payload);
       }
@@ -163,8 +145,13 @@ export default function EventBuilderPage() {
       if (response?.event) {
         setForm(hydrateForm(response.event));
         setSelectedId(response.event.id);
-        upsertEventLocally(response.event);
-        setMessage(mode === "create" ? "Event created" : "Event updated");
+        setMode("edit");
+        setSearchParams((prev) => {
+          const params = new URLSearchParams(prev);
+          params.set("eventId", response.event.id);
+          return params;
+        });
+        setMessage(wasCreating ? "Event created" : "Event updated");
       }
     } catch (err) {
       setMessage(err.message || "Unable to save event");
@@ -182,7 +169,6 @@ export default function EventBuilderPage() {
 
       if (response?.event) {
         setForm(hydrateForm(response.event));
-        upsertEventLocally(response.event);
       }
     } catch (err) {
       setMessage(err.message || "Unable to update status");
@@ -195,7 +181,6 @@ export default function EventBuilderPage() {
     if (!confirmed) return;
     try {
       await deleteEventApi(selectedId, token);
-      setEvents((prev) => prev.filter((evt) => evt.id !== selectedId));
       startCreateFlow();
       setMessage("Event deleted");
     } catch (err) {
@@ -242,52 +227,11 @@ export default function EventBuilderPage() {
       </div>
       {message && <p className="text-sm text-primary-600">{message}</p>}
 
-      <div className="grid gap-6 lg:grid-cols-[0.45fr_1fr]">
-        <Card className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
-                <CalendarRange className="h-4 w-4 text-primary-600" strokeWidth={1.8} /> Your events
-              </p>
-              <h2 className="font-display text-xl text-slate-900">Invite links</h2>
-            </div>
-            <Button size="sm" variant="secondary" onClick={startCreateFlow}>
-              + New
-            </Button>
-          </div>
-          {eventsLoading ? (
-            <div className="flex min-h-[200px] items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-100 border-t-primary-500" />
-            </div>
-          ) : events.length === 0 ? (
-            <p className="text-sm text-slate-500">No events yet. Create one to generate a unique invite link.</p>
-          ) : (
-            <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: "70vh" }}>
-              {events.map((event) => (
-                <button
-                  key={event.id}
-                  type="button"
-                  onClick={() => handleSelectEvent(event.id)}
-                  className={`w-full rounded-2xl border p-4 text-left transition ${
-                    selectedId === event.id ? "border-primary-400 bg-primary-50/60" : "border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">{event.title}</p>
-                      <p className="text-xs text-slate-500">{formatDateRange(event.startDate, event.endDate) || "Schedule pending"}</p>
-                    </div>
-                    <Badge tone={event.isRegistrationOpen ? "success" : "warning"}>
-                      {event.isRegistrationOpen ? "Live" : "Closed"}
-                    </Badge>
-                  </div>
-                  <p className="mt-2 break-all text-xs text-slate-500">{event.shareUrl}</p>
-                </button>
-              ))}
-            </div>
-          )}
+      {loadingEvent ? (
+        <Card className="flex min-h-[40vh] items-center justify-center">
+          <div className="spinner-ring" />
         </Card>
-
+      ) : (
         <form id="event-form" onSubmit={handleSubmit} className="space-y-6">
           <Card className="space-y-6">
             <div>
@@ -419,7 +363,7 @@ export default function EventBuilderPage() {
             </div>
           )}
         </form>
-      </div>
+      )}
     </div>
   );
 }

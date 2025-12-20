@@ -2,9 +2,10 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 
 const links = [
-  { to: "/admin", label: "Dashboard" },
+  { to: "/admin", label: "Dashboard", end: true },
+  { to: "/admin/events", label: "Manage events", end: true },
+  { to: "/admin/events/builder", label: "Event builder" },
   { to: "/admin/attendees", label: "Registrations" },
-  { to: "/admin/events", label: "Event Builder" },
 ];
 
 export default function AdminShell() {
@@ -22,7 +23,7 @@ export default function AdminShell() {
             <NavLink
               key={link.to}
               to={link.to}
-              end={link.to === "/admin"}
+              end={link.end}
               className={({ isActive }) =>
                 `rounded-xl px-4 py-3 text-sm font-medium transition ${
                   isActive ? "bg-primary-500/10 text-primary-600" : "text-slate-600 hover:bg-slate-100"
