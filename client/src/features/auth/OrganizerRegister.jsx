@@ -5,8 +5,6 @@ import Input from "../../components/ui/Input";
 import { useAuth } from "../../hooks/useAuth";
 import { registerAdmin } from "../../services/auth.service";
 
-const defaultAccessKey = import.meta.env.VITE_ADMIN_KEY || "";
-
 export default function OrganizerRegister() {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -15,7 +13,6 @@ export default function OrganizerRegister() {
     email: "",
     password: "",
     confirmPassword: "",
-    accessKey: defaultAccessKey,
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -39,7 +36,6 @@ export default function OrganizerRegister() {
         displayName: form.displayName,
         email: form.email,
         password: form.password,
-        accessKey: form.accessKey,
       });
       await login({ email: form.email, password: form.password });
       navigate("/admin", { replace: true });
@@ -55,24 +51,24 @@ export default function OrganizerRegister() {
       <section className="flex flex-col justify-between bg-primary-900 px-10 py-12 text-white">
         <div>
           <p className="text-xs uppercase tracking-[0.35em] text-white/70">EventQuota</p>
-          <h1 className="mt-4 font-display text-4xl">Create organizer access</h1>
+          <h1 className="mt-4 font-display text-4xl">Start inviting in minutes</h1>
           <p className="mt-3 max-w-lg text-white/80">
-            Issue secure credentials for trusted teammates. You will need the organizer access key provided by the
-            system owner to complete this form.
+            Anyone can create an organizer profile, publish events, and track RSVPs. All you need is an email address
+            and a strong password.
           </p>
         </div>
         <ul className="space-y-3 text-white/80">
           <li className="flex items-center gap-3">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/15 font-semibold">1</span>
-            Verify the access key with your ops lead
+            Enter your name so attendees recognize you
           </li>
           <li className="flex items-center gap-3">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/15 font-semibold">2</span>
-            Fill in your work email and a strong password
+            Use any email (personal or work) and choose a strong password
           </li>
           <li className="flex items-center gap-3">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/15 font-semibold">3</span>
-            Sign in instantly to start managing quotas
+            Sign in instantly to start creating events
           </li>
         </ul>
       </section>
@@ -80,10 +76,10 @@ export default function OrganizerRegister() {
         <form onSubmit={handleSubmit} className="w-full max-w-md space-y-5">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">New organizer</p>
-            <h2 className="mt-2 font-display text-3xl text-slate-900">Request access</h2>
+            <h2 className="mt-2 font-display text-3xl text-slate-900">Create your account</h2>
             <p className="mt-2 text-sm text-slate-500">
-              The access key ensures only approved staff can create accounts. Reach out to your administrator if you do
-              not have one yet.
+              Your dashboard is private to you. Use an email you can verify so attendees receive notifications from a name
+              they trust.
             </p>
           </div>
           <Input
@@ -93,7 +89,7 @@ export default function OrganizerRegister() {
             required
           />
           <Input
-            label="Work email"
+            label="Email address"
             type="email"
             value={form.email}
             onChange={(e) => handleChange("email", e.target.value)}
@@ -112,13 +108,6 @@ export default function OrganizerRegister() {
             value={form.confirmPassword}
             onChange={(e) => handleChange("confirmPassword", e.target.value)}
             required
-          />
-          <Input
-            label="Organizer access key"
-            value={form.accessKey}
-            onChange={(e) => handleChange("accessKey", e.target.value)}
-            required
-            hint="Provided in your deployment .env as ADMIN_KEY"
           />
           {error && <p className="text-sm font-semibold text-danger">{error}</p>}
           <Button type="submit" disabled={submitting} className="w-full justify-center">

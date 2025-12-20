@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 import Admin from "../models/Admin.js";
 
-const HEADER_CANDIDATES = ["x-admin-key", "admin-key"];
 const JWT_SECRET = process.env.ADMIN_JWT_SECRET || "dev-admin-secret";
 
 async function authenticateWithBearer(req) {
@@ -24,23 +23,10 @@ async function authenticateWithBearer(req) {
 
 export default async function requireAdmin(req, res, next) {
 	const adminFromToken = await authenticateWithBearer(req);
-	if (adminFromToken) {
-		req.admin = adminFromToken;
-		return next();
-	}
-
-	const configuredKey = process.env.ADMIN_KEY;
-	if (!configuredKey) {
+	if (!adminFromToken) {
 		return res.status(401).json({ message: "Authentication required" });
 	}
 
-	const supplied = HEADER_CANDIDATES
-		.map((name) => req.headers[name] || req.headers[name.toUpperCase()])
-		.find(Boolean);
-
-	if (supplied !== configuredKey) {
-		return res.status(401).json({ message: "Admin key missing or invalid" });
-	}
-
+	req.admin = adminFromToken;
 	return next();
 }

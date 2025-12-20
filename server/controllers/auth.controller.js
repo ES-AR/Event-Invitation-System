@@ -61,18 +61,14 @@ export const getCurrentAdmin = async (req, res) => {
 
 export const registerAdmin = async (req, res) => {
   try {
-    const { accessKey, email, password, displayName } = req.body || {};
-
-    if (!process.env.ADMIN_KEY) {
-      return res.status(500).json({ message: "Admin registration is not configured" });
-    }
-
-    if (!accessKey || accessKey !== process.env.ADMIN_KEY) {
-      return res.status(403).json({ message: "Invalid organizer access key" });
-    }
+    const { email, password, displayName } = req.body || {};
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
     }
 
     const normalizedEmail = email.trim().toLowerCase();

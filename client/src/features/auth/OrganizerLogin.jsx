@@ -42,12 +42,12 @@ export default function OrganizerLogin() {
           <p className="text-xs uppercase tracking-[0.35em] text-white/70">EventQuota</p>
           <h1 className="mt-4 font-display text-4xl">Organizer Login</h1>
           <p className="mt-3 max-w-md text-white/80">
-            Manage quotas, approvals, and live check-ins from anywhere. Built for precision operations teams.
+            Sign back in to edit events, approve guests, and monitor check-ins—all from your personal dashboard.
           </p>
         </div>
         <div className="rounded-3xl bg-white/10 p-6 text-white backdrop-blur">
-          <p className="text-lg font-semibold">“Real-time attendance tracking is a game changer for our team.”</p>
-          <p className="mt-3 text-sm text-white/80">Elena Rodriguez · Head of Operations, GlobalTech</p>
+          <p className="text-lg font-semibold">“I set up my birthday launch and community meetup in one weekend.”</p>
+          <p className="mt-3 text-sm text-white/80">Elena · Creator & Host</p>
         </div>
       </section>
       <section className="flex items-center bg-white px-8 py-12">
@@ -55,7 +55,7 @@ export default function OrganizerLogin() {
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Secure Portal</p>
             <h2 className="mt-2 font-display text-3xl text-slate-900">Welcome back</h2>
-            <p className="mt-2 text-sm text-slate-500">Use the organizer credentials provided during onboarding.</p>
+            <p className="mt-2 text-sm text-slate-500">Log in with the email and password you used during signup.</p>
           </div>
           <Input
             label="Email address"
@@ -102,8 +102,8 @@ export default function OrganizerLogin() {
             {submitting ? "Signing in..." : "Log In"}
           </Button>
           <p className="text-sm text-slate-500">
-            Need an organizer seat? <Link to="/admin/register" className="text-primary-600">Request access</Link>
-            {" "}or <Link to="/" className="text-primary-600">contact support</Link>.
+            Need an account? <Link to="/admin/register" className="text-primary-600">Create one</Link>
+            {" "}or <Link to="/" className="text-primary-600">explore the public site</Link>.
           </p>
         </form>
       </section>
