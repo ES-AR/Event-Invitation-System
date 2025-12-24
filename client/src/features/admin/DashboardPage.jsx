@@ -136,7 +136,10 @@ export default function DashboardPage() {
               <div className="flex-1">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Select event</p>
                 <h2 className="font-display text-2xl text-slate-900">{selectedEvent?.title}</h2>
-                <p className="text-sm text-slate-500">{formatDateRange(selectedEvent?.startDate, selectedEvent?.endDate) || "Schedule pending"}</p>
+                <p className="text-sm text-slate-500">
+                  {formatDateRange(selectedEvent?.startDate, selectedEvent?.endDate, selectedEvent?.timezone || "UTC") ||
+                    "Schedule pending"}
+                </p>
               </div>
               <label className="text-sm font-medium text-slate-700">
                 Active invites
@@ -204,7 +207,9 @@ export default function DashboardPage() {
                     <div>
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Quota health</p>
                       <h2 className="font-display text-2xl text-slate-900">{selectedEvent?.title}</h2>
-                      <p className="text-sm text-slate-500">{formatDateRange(selectedEvent?.startDate, selectedEvent?.endDate)}</p>
+                      <p className="text-sm text-slate-500">
+                        {formatDateRange(selectedEvent?.startDate, selectedEvent?.endDate, selectedEvent?.timezone || "UTC")}
+                      </p>
                     </div>
                     <Badge tone={selectedEvent?.isRegistrationOpen ? "success" : "warning"}>
                       {selectedEvent?.isRegistrationOpen ? "Accepting" : "Closed"}
@@ -237,7 +242,9 @@ export default function DashboardPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-slate-800">{event.title}</p>
-                        <p className="text-xs text-slate-500">{formatDateRange(event.startDate, event.endDate) || "Schedule pending"}</p>
+                        <p className="text-xs text-slate-500">
+                          {formatDateRange(event.startDate, event.endDate, event.timezone || "UTC") || "Schedule pending"}
+                        </p>
                       </div>
                       <Badge tone={event.isRegistrationOpen ? "success" : "warning"}>
                         {event.isRegistrationOpen ? "Live" : "Closed"}

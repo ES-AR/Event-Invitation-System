@@ -124,13 +124,33 @@ export const registerUser = async (req, res) => {
     }
 
     const [mainCount, overflowCount] = await slotCountsForEvent(event._id);
-    let slotType = "main";
+    const tierPreference = (ticketTier || "Main").toString().trim().toLowerCase();
+    const wantsOverflow = tierPreference === "overflow";
+    const overflowCapacity = event.maxOverflowSlots || 0;
+    let slotType = wantsOverflow ? "overflow" : "main";
 
-    if (mainCount >= event.maxMainSlots) {
-      if (event.maxOverflowSlots === 0 || overflowCount >= event.maxOverflowSlots) {
-        return res.status(400).json({ message: "All slots are currently full" });
+    if (wantsOverflow) {
+      if (!overflowCapacity) {
+        return res.status(400).json({ message: "Overflow registration is not enabled for this event." });
+      }
+      if (mainCount < event.maxMainSlots) {
+        return res.status(400).json({
+          message: "Main quota still has space. Use the primary registration link.",
+          code: "MAIN_AVAILABLE",
+        });
+      }
+      if (overflowCount >= overflowCapacity) {
+        return res.status(400).json({ message: "Overflow slots are currently full" });
       }
       slotType = "overflow";
+    } else {
+      if (mainCount >= event.maxMainSlots) {
+        return res.status(400).json({
+          message: "Main quota is full. Request the overflow link from your host.",
+          code: "MAIN_FULL",
+        });
+      }
+      slotType = "main";
     }
 
     const status = event.requiresApproval ? "pending" : "approved";

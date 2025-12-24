@@ -10,17 +10,19 @@ export function formatDateRange(start, end, timezone = "UTC") {
     hour: "numeric",
     minute: "2-digit",
     timeZone: timezone,
+    timeZoneName: "short",
   });
 
   const endFormatter = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
     timeZone: timezone,
+    timeZoneName: "short",
   });
 
   const startLabel = startFormatter.format(startDate);
   if (!endDate) return startLabel;
-  return `${startLabel} — ${endFormatter.format(endDate)} (${timezone})`;
+  return `${startLabel} — ${endFormatter.format(endDate)}`;
 }
 
 export function formatNumber(value = 0) {

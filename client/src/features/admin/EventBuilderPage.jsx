@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Copy, FileText, Layers3, Link2, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import Card from "../../components/ui/Card";
@@ -6,6 +6,7 @@ import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import { useAuth } from "../../hooks/useAuth";
 import {
+  checkSlugAvailability,
   closeRegistration,
   createEvent,
   deleteEvent as deleteEventApi,
@@ -14,6 +15,24 @@ import {
   updateEvent,
 } from "../../services/event.service";
 
+const localTimeZone = Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone || "UTC";
+const timezoneCatalog = [
+  "Africa/Lagos",
+  "Africa/Johannesburg",
+  "Africa/Cairo",
+  "Europe/London",
+  "Europe/Berlin",
+  "Europe/Paris",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+  "America/New_York",
+  "America/Los_Angeles",
+  "UTC",
+];
+const timezoneOptions = Array.from(new Set([localTimeZone, ...timezoneCatalog]));
+
 const defaultEvent = {
   title: "",
   description: "",
@@ -21,43 +40,148 @@ const defaultEvent = {
   location: "",
   venueAddress: "",
   startDate: "",
+  startTime: "",
   endDate: "",
+  endTime: "",
   maxMainSlots: 100,
   maxOverflowSlots: 0,
   requiresApproval: true,
   allowWalkIns: false,
   registrationClosesAt: "",
+  registrationClosesTime: "",
   publicSlug: "",
   publicInviteEnabled: true,
   checkInInstructions: "",
   contactEmail: "",
+  timezone: localTimeZone,
 };
 
-const isoDate = (value) => (value ? new Date(value).toISOString().slice(0, 10) : "");
+const formatDateForInput = (value, timeZone = localTimeZone) => {
+  if (!value) return "";
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(value));
+  } catch (error) {
+    console.warn("Unable to format date for input", error);
+    return new Date(value).toISOString().slice(0, 10);
+  }
+};
 
-const hydrateForm = (event = defaultEvent) => ({
-  ...defaultEvent,
-  ...event,
-  startDate: isoDate(event.startDate),
-  endDate: isoDate(event.endDate),
-  registrationClosesAt: isoDate(event.registrationClosesAt),
-});
+const formatTimeForInput = (value, timeZone = localTimeZone) => {
+  if (!value) return "";
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(value));
+  } catch (error) {
+    console.warn("Unable to format time for input", error);
+    return new Date(value).toISOString().slice(11, 16);
+  }
+};
 
+const getTimeZoneOffset = (timeZone, date = new Date()) => {
+  try {
+    const dtf = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    const parts = dtf.formatToParts(date).reduce((acc, part) => {
+      if (part.type !== "literal") {
+        acc[part.type] = part.value;
+      }
+      return acc;
+    }, {});
+    const asUTC = Date.UTC(
+      parts.year,
+      Number(parts.month) - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second
+    );
+    return asUTC - date.getTime();
+  } catch (error) {
+    console.warn("Unable to compute timezone offset", error);
+    return 0;
+  }
+};
+
+const combineDateTime = (date, time, timeZone = localTimeZone) => {
+  if (!date) return null;
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour = 0, minute = 0] = (time || "00:00").split(":").map(Number);
+  const assumedUTC = new Date(Date.UTC(year, (month || 1) - 1, day || 1, hour, minute));
+  const offset = getTimeZoneOffset(timeZone, assumedUTC);
+  return new Date(assumedUTC.getTime() - offset).toISOString();
+};
+
+const hydrateForm = (event = defaultEvent) => {
+  const timeZone = event.timezone || localTimeZone;
+  return {
+    ...defaultEvent,
+    ...event,
+    timezone: timeZone,
+    startDate: formatDateForInput(event.startDate, timeZone),
+    startTime: formatTimeForInput(event.startDate, timeZone),
+    endDate: formatDateForInput(event.endDate, timeZone),
+    endTime: formatTimeForInput(event.endDate, timeZone),
+    registrationClosesAt: formatDateForInput(event.registrationClosesAt, timeZone),
+    registrationClosesTime: formatTimeForInput(event.registrationClosesAt, timeZone),
+  };
+};
 export default function EventBuilderPage() {
   const { token } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState(null);
-  const [form, setForm] = useState(defaultEvent);
+  const [form, setForm] = useState({ ...defaultEvent });
   const [mode, setMode] = useState("create");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [copyState, setCopyState] = useState(null);
   const [loadingEvent, setLoadingEvent] = useState(false);
   const copyTimer = useRef(null);
+  const slugCheckTimer = useRef(null);
+  const [slugStatus, setSlugStatus] = useState({ state: "idle" });
   const eventIdParam = searchParams.get("eventId");
 
   const inviteOrigin = typeof window !== "undefined" ? window.location.origin : "https://invite.local";
-  const previewLink = form.shareUrl || `${inviteOrigin}/invite/${form.publicSlug || "your-slug"}`;
+  const previewLinks = useMemo(() => {
+    const slugSegment = form.publicSlug?.trim() || "your-slug";
+    const baseLink = `${inviteOrigin}/invite/${slugSegment}`;
+    return {
+      main: baseLink,
+      overflow: `${baseLink}?tier=overflow`,
+    };
+  }, [form.publicSlug, inviteOrigin]);
+  const slugHint = useMemo(() => {
+    switch (slugStatus.state) {
+      case "checking":
+        return "Checking availability...";
+      case "available":
+        return "Slug looks good.";
+      case "adjusted":
+        return `Slug in use. Updated to ${slugStatus.slug}.`;
+      case "unavailable":
+        return "Slug already in use.";
+      case "error":
+        return slugStatus.message || "Unable to verify slug.";
+      default:
+        return "This becomes the shareable link suffix.";
+    }
+  }, [slugStatus]);
 
 
   const loadEvent = useCallback(
@@ -88,10 +212,53 @@ export default function EventBuilderPage() {
     } else {
       setSelectedId(null);
       setMode("create");
-      setForm(defaultEvent);
+      setForm({ ...defaultEvent });
       setMessage("");
     }
   }, [eventIdParam, loadEvent, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    const slugCandidate = (form.publicSlug || "").trim();
+    if (!slugCandidate) {
+      setSlugStatus({ state: "idle" });
+      if (slugCheckTimer.current) {
+        clearTimeout(slugCheckTimer.current);
+      }
+      return;
+    }
+
+    if (slugCheckTimer.current) {
+      clearTimeout(slugCheckTimer.current);
+    }
+
+    slugCheckTimer.current = setTimeout(async () => {
+      try {
+        setSlugStatus({ state: "checking", slug: slugCandidate });
+        const response = await checkSlugAvailability(token, slugCandidate, selectedId);
+        const resolvedSlug = response?.slug || slugCandidate;
+        if (response?.available) {
+          setSlugStatus({ state: "available", slug: resolvedSlug });
+          return;
+        }
+
+        if (resolvedSlug !== slugCandidate) {
+          setSlugStatus({ state: "adjusted", slug: resolvedSlug });
+          setForm((prev) => ({ ...prev, publicSlug: resolvedSlug }));
+        } else {
+          setSlugStatus({ state: "unavailable", slug: resolvedSlug });
+        }
+      } catch (error) {
+        setSlugStatus({ state: "error", message: error.message || "Unable to verify slug" });
+      }
+    }, 450);
+
+    return () => {
+      if (slugCheckTimer.current) {
+        clearTimeout(slugCheckTimer.current);
+      }
+    };
+  }, [form.publicSlug, token, selectedId]);
 
   useEffect(
     () => () => {
@@ -105,7 +272,7 @@ export default function EventBuilderPage() {
   const startCreateFlow = () => {
     setSelectedId(null);
     setMode("create");
-    setForm(defaultEvent);
+    setForm({ ...defaultEvent });
     setMessage("");
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev);
@@ -119,9 +286,30 @@ export default function EventBuilderPage() {
   };
 
   const buildPayload = () => {
-    const { id, shareUrl, createdAt, updatedAt, quota, ...payload } = form;
+    const {
+      id,
+      shareUrl,
+      createdAt,
+      updatedAt,
+      quota,
+      startTime,
+      endTime,
+      registrationClosesTime,
+      timezone,
+      ...payload
+    } = form;
+    const resolvedTimeZone = timezone || localTimeZone;
+
     return {
       ...payload,
+      timezone: resolvedTimeZone,
+      startDate: combineDateTime(payload.startDate, startTime, resolvedTimeZone),
+      endDate: combineDateTime(payload.endDate, endTime, resolvedTimeZone),
+      registrationClosesAt: combineDateTime(
+        payload.registrationClosesAt,
+        registrationClosesTime,
+        resolvedTimeZone
+      ),
       maxMainSlots: Number(payload.maxMainSlots) || 0,
       maxOverflowSlots: Number(payload.maxOverflowSlots) || 0,
     };
@@ -260,11 +448,30 @@ export default function EventBuilderPage() {
               <Input label="End date" type="date" value={form.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
+              <Input label="Start time" type="time" value={form.startTime} onChange={(e) => handleChange("startTime", e.target.value)} />
+              <Input label="End time" type="time" value={form.endTime} onChange={(e) => handleChange("endTime", e.target.value)} />
+            </div>
+            <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+              Event timezone
+              <select
+                value={form.timezone}
+                onChange={(e) => handleChange("timezone", e.target.value)}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 focus:border-primary-400 focus:outline-none"
+              >
+                {timezoneOptions.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid gap-4 md:grid-cols-2">
               <Input
                 label="Invite slug"
                 value={form.publicSlug}
                 onChange={(e) => handleChange("publicSlug", e.target.value)}
-                hint="This becomes the shareable link suffix"
+                hint={slugHint}
+                required
               />
               <Input label="Support email" value={form.contactEmail || ""} onChange={(e) => handleChange("contactEmail", e.target.value)} />
             </div>
@@ -272,18 +479,34 @@ export default function EventBuilderPage() {
               <p className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
                 <Link2 className="h-4 w-4 text-primary-600" strokeWidth={1.8} /> Live link
               </p>
-              <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-dashed border-slate-200 p-4 text-sm">
-                <span className="break-all font-mono text-xs text-slate-500">{previewLink}</span>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="self-start"
-                  onClick={() => handleCopy(previewLink)}
-                >
-                  <Copy className="mr-2 h-4 w-4" strokeWidth={1.8} />
-                  {copyState === previewLink ? "Copied" : "Copy share link"}
-                </Button>
+              <div className="mt-2 space-y-3">
+                {[{ key: "main", label: "Main registration", value: previewLinks.main }]
+                  .concat(
+                    Number(form.maxOverflowSlots) > 0
+                      ? [{ key: "overflow", label: "Overflow backup link", value: previewLinks.overflow }]
+                      : []
+                  )
+                  .map((link) => (
+                    <div
+                      key={link.key}
+                      className="flex flex-col gap-2 rounded-2xl border border-dashed border-slate-200 p-4 text-sm"
+                    >
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                        {link.label}
+                      </span>
+                      <span className="break-all font-mono text-xs text-slate-500">{link.value}</span>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="self-start"
+                        onClick={() => handleCopy(link.value)}
+                      >
+                        <Copy className="mr-2 h-4 w-4" strokeWidth={1.8} />
+                        {copyState === link.value ? "Copied" : "Copy link"}
+                      </Button>
+                    </div>
+                  ))}
               </div>
             </div>
           </Card>
@@ -330,12 +553,20 @@ export default function EventBuilderPage() {
                 />
                 Public invite link enabled
               </label>
-              <Input
-                label="Registration closes on"
-                type="date"
-                value={form.registrationClosesAt}
-                onChange={(e) => handleChange("registrationClosesAt", e.target.value)}
-              />
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Registration closes on"
+                  type="date"
+                  value={form.registrationClosesAt}
+                  onChange={(e) => handleChange("registrationClosesAt", e.target.value)}
+                />
+                <Input
+                  label="Registration closes at"
+                  type="time"
+                  value={form.registrationClosesTime}
+                  onChange={(e) => handleChange("registrationClosesTime", e.target.value)}
+                />
+              </div>
             </Card>
           </div>
 

@@ -103,6 +103,29 @@ export const listOrganizerEvents = async (req, res) => {
   }
 };
 
+export const checkSlugAvailability = async (req, res) => {
+  try {
+    const desiredSlug = req.query.slug || req.body?.slug || DEFAULT_EVENT_SLUG;
+    const eventId = req.query.eventId || req.body?.eventId;
+    const normalized = normalizeSlug(desiredSlug);
+    const filter = eventId ? { _id: { $ne: eventId } } : {};
+    const exists = await Event.exists({ publicSlug: normalized, ...filter });
+
+    if (!exists) {
+      return res.json({ available: true, slug: normalized });
+    }
+
+    const uniqueSuggestion = await generateUniqueSlug(normalized, eventId, {
+      forcePrefixedSuggestion: true,
+    });
+
+    return res.json({ available: false, slug: uniqueSuggestion });
+  } catch (error) {
+    console.error("Error checking slug availability", error);
+    res.status(500).json({ message: "Unable to verify slug", error: error.message });
+  }
+};
+
 export const createEvent = async (req, res) => {
   try {
     const baseSlugSource = req.body?.publicSlug || req.body?.title || DEFAULT_EVENT_SLUG;

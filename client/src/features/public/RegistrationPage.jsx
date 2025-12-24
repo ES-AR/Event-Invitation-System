@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
-  Activity,
   Briefcase,
-  Building2,
   CalendarClock,
   CheckCircle2,
-  MapPin,
   Mail,
+  MapPin,
   Phone,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
+  Ticket,
   UserRound,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
@@ -26,22 +26,22 @@ const initialForm = {
   lastName: "",
   email: "",
   phone: "",
-  organization: "",
   jobTitle: "",
-  dietaryRestrictions: "None",
-  note: "",
   captchaAnswer: "",
-  agree: false,
 };
 
 const trustPoints = [
-  "Tiered quotas and overflow lists keep commitments precise.",
-  "Instant duplicate detection prevents double-booking.",
-  "Integrated check-in photo audit for security teams.",
+  "Duplicate detection keeps your invite unique.",
+  "Hosts may approve RSVP before sharing directions.",
+  "Photo check-in protects every entrance queue.",
 ];
 
 export default function RegistrationPage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const tierParam = (searchParams.get("tier") || "").toLowerCase();
+  const activeTier = tierParam === "overflow" ? "overflow" : "main";
+  const isOverflowView = activeTier === "overflow";
   const [event, setEvent] = useState(null);
   const [captcha, setCaptcha] = useState(null);
   const [form, setForm] = useState(initialForm);
@@ -77,16 +77,28 @@ export default function RegistrationPage() {
 
   const tierPill = useMemo(() => {
     if (!event) return null;
-    const remaining = event.quota?.main?.remaining ?? 0;
-    const soldOut = remaining <= 0;
-    return (
-      <Badge tone={soldOut ? "warning" : "success"}>{soldOut ? "Overflow Registration" : "Main Slot"}</Badge>
-    );
-  }, [event]);
+    const label = activeTier === "overflow" ? "Overflow Registration" : "Main Slot";
+    const tone = activeTier === "overflow" ? "warning" : "success";
+    return <Badge tone={tone}>{label}</Badge>;
+  }, [event, activeTier]);
 
   const handleChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
+
+  const quotaStats = useMemo(() => {
+    const main = event?.quota?.main || { capacity: 0, used: 0, remaining: 0 };
+    const overflow = event?.quota?.overflow || { capacity: 0, used: 0, remaining: 0 };
+    const percent = (data) => {
+      if (!data || !data.capacity) return 0;
+      return Math.min((data.used / data.capacity) * 100, 100);
+    };
+    return {
+      main: { ...main, percent: percent(main) },
+      overflow: { ...overflow, percent: percent(overflow) },
+    };
+  }, [event]);
+  const visibleTierData = isOverflowView ? quotaStats.overflow : quotaStats.main;
 
   const refreshCaptcha = async () => {
     const updated = await requestCaptcha();
@@ -96,13 +108,37 @@ export default function RegistrationPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.agree) {
-      setError("Please agree to the terms to continue");
-      return;
-    }
     if (!captcha?.token) {
       setError("Captcha expired. Please refresh and try again.");
       return;
+    }
+    if (!event) {
+      setError("Event details are still loading. Try again.");
+      return;
+    }
+
+    const mainRemaining = quotaStats.main?.remaining ?? 0;
+    const overflowRemaining = quotaStats.overflow?.remaining ?? 0;
+    const overflowConfigured = (event.maxOverflowSlots ?? quotaStats.overflow?.capacity ?? 0) > 0;
+
+    if (!isOverflowView && mainRemaining <= 0) {
+      setError("Main quota is full. Please request the overflow link from your host.");
+      return;
+    }
+
+    if (isOverflowView) {
+      if (!overflowConfigured) {
+        setError("Overflow quota is not available for this event.");
+        return;
+      }
+      if (mainRemaining > 0) {
+        setError("Main quota still has space. Use the primary registration link.");
+        return;
+      }
+      if (overflowRemaining <= 0) {
+        setError("Overflow quota is currently full.");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -114,7 +150,8 @@ export default function RegistrationPage() {
         fullName: `${form.firstName} ${form.lastName}`.trim(),
         captchaToken: captcha.token,
         slug: slug || event?.publicSlug,
-        ticketTier: event?.quota?.main?.remaining > 0 ? "Main" : "Overflow",
+        ticketTier: isOverflowView ? "Overflow" : "Main",
+        dietaryRestrictions: "None",
       };
       const { message, registration } = await submitRegistration(payload);
       setStatus({ message, registration });
@@ -135,14 +172,24 @@ export default function RegistrationPage() {
   }
 
   if (status) {
+    const suffix = isOverflowView ? "?tier=overflow" : "";
+    const inviteUrl = typeof window !== "undefined" && event?.publicSlug
+      ? `https://${window.location.host}/invite/${event.publicSlug}${suffix}`
+      : event?.publicSlug
+        ? `/invite/${event.publicSlug}${suffix}`
+        : "";
     return (
       <div className="mx-auto max-w-3xl px-6 py-16">
-        <Card className="text-center">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Registration Received</p>
-          <h2 className="mt-4 font-display text-3xl text-slate-900">{status.registration?.fullName}</h2>
-          <p className="mt-2 text-slate-500">{status.message}</p>
-          <div className="mt-8">
-            <Button onClick={() => window.print()} className="w-full justify-center">
+        <Card className="overflow-hidden border-0 bg-gradient-to-br from-slate-900 via-primary-900 to-rose-800 p-10 text-white">
+          <p className="text-xs uppercase tracking-[0.4em] text-white/70">Registration confirmed</p>
+          <h2 className="mt-4 text-3xl font-semibold">Thanks, {status.registration?.fullName}!</h2>
+          <p className="mt-2 text-sm text-white/80">{status.message}</p>
+          <div className="mt-8 grid gap-4 text-sm">
+            <div className="rounded-2xl border border-white/20 bg-white/10 p-4">
+              <p className="font-semibold">Invite link</p>
+              <p className="text-white/70">{inviteUrl}</p>
+            </div>
+            <Button onClick={() => window.print()} variant="secondary" className="bg-white text-slate-900">
               Save confirmation
             </Button>
           </div>
@@ -152,151 +199,165 @@ export default function RegistrationPage() {
   }
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-10 px-6 py-10 lg:grid-cols-[1fr_1.1fr]">
-      <section className="space-y-6">
-        <Card className="bg-white/90">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Event Overview</p>
-          <h2 className="mt-3 font-display text-3xl text-slate-900">{event?.title}</h2>
-          <p className="mt-2 text-slate-500">{event?.description}</p>
-          <div className="mt-6 grid gap-4">
-            <div className="rounded-2xl border border-slate-100 p-4">
-              <div className="flex items-center gap-2 text-primary-600">
-                <CalendarClock className="h-4 w-4" strokeWidth={1.8} />
-                <p className="text-xs uppercase tracking-[0.3em] text-primary-600">When</p>
-              </div>
-              <p className="mt-1 text-sm font-semibold text-slate-800">
-                {formatDateRange(event?.startDate, event?.endDate, event?.timezone)}
-              </p>
+    <div className="bg-slate-50 py-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 lg:flex-row">
+        <section className="flex-1 space-y-6">
+          <article className="overflow-hidden rounded-[32px] border border-slate-900/10 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 p-8 text-white shadow-2xl">
+            <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.35em] text-white/70">
+              <Sparkles className="h-4 w-4" strokeWidth={1.6} /> RSVP portal
+              {tierPill}
             </div>
-            <div className="rounded-2xl border border-slate-100 p-4">
-              <div className="flex items-center gap-2 text-primary-600">
-                <MapPin className="h-4 w-4" strokeWidth={1.8} />
-                <p className="text-xs uppercase tracking-[0.3em] text-primary-600">Where</p>
+            <h2 className="mt-4 font-display text-3xl leading-tight sm:text-4xl">{event?.title}</h2>
+            <p className="mt-2 text-sm text-white/70">{event?.description}</p>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl bg-white/10 p-4">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-white/60">
+                  <CalendarClock className="h-4 w-4" /> When
+                </div>
+                <p className="mt-2 text-base font-semibold text-white">
+                  {formatDateRange(event?.startDate, event?.endDate, event?.timezone)}
+                </p>
               </div>
-              <p className="mt-1 text-sm font-semibold text-slate-800">{event?.venueName || event?.location}</p>
-              <p className="text-xs text-slate-500">{event?.venueAddress}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-100 p-4">
-              <div className="flex items-center gap-2 text-primary-600">
-                <Activity className="h-4 w-4" strokeWidth={1.8} />
-                <p className="text-xs uppercase tracking-[0.3em] text-primary-600">Registration Status</p>
-              </div>
-              <div className="mt-2 flex items-center gap-3">
-                {tierPill}
-                <span className="text-sm text-slate-500">
-                  {event?.isRegistrationOpen ? "Open" : event?.closeReason || "Closed"}
-                </span>
-              </div>
-              <div className="mt-3 space-y-2 text-sm text-slate-600">
-                <p>Main slots remaining: {event?.quota?.main?.remaining ?? "—"}</p>
-                <p>Overflow slots remaining: {event?.quota?.overflow?.remaining ?? "—"}</p>
+              <div className="rounded-2xl bg-white/10 p-4">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-white/60">
+                  <MapPin className="h-4 w-4" /> Where
+                </div>
+                <p className="mt-2 text-base font-semibold text-white">{event?.venueName || event?.location}</p>
+                <p className="text-xs text-white/70">{event?.venueAddress || "Exact address shared post-approval."}</p>
               </div>
             </div>
-          </div>
-        </Card>
-        <Card>
-          <p className="text-sm font-semibold text-slate-800">Why organizers trust EventHub</p>
-          <ul className="mt-4 space-y-3 text-sm text-slate-600">
-            {trustPoints.map((point) => (
-              <li key={point} className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary-500" strokeWidth={2} />
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </section>
-      <section>
-        <form onSubmit={handleSubmit} className="space-y-6 rounded-3xl border border-slate-100 bg-white/90 p-8 shadow-card">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Secure Registration</p>
-            <h2 className="mt-2 font-display text-2xl text-slate-900">Attendee Information</h2>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="First name"
-              icon={<UserRound className="h-4 w-4" strokeWidth={1.8} />}
-              value={form.firstName}
-              onChange={(e) => handleChange("firstName", e.target.value)}
-              required
-            />
-            <Input
-              label="Last name"
-              icon={<UserRound className="h-4 w-4" strokeWidth={1.8} />}
-              value={form.lastName}
-              onChange={(e) => handleChange("lastName", e.target.value)}
-              required
-            />
-          </div>
-          <Input
-            label="Work email"
-            type="email"
-            icon={<Mail className="h-4 w-4" strokeWidth={1.8} />}
-            value={form.email}
-            onChange={(e) => handleChange("email", e.target.value)}
-            required
-            hint="We’ll send confirmations here"
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Phone"
-              icon={<Phone className="h-4 w-4" strokeWidth={1.8} />}
-              value={form.phone}
-              onChange={(e) => handleChange("phone", e.target.value)}
-              placeholder="+1 (555) 000-0000"
-            />
-            <Input
-              label="Organization"
-              icon={<Building2 className="h-4 w-4" strokeWidth={1.8} />}
-              value={form.organization}
-              onChange={(e) => handleChange("organization", e.target.value)}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Job title"
-              icon={<Briefcase className="h-4 w-4" strokeWidth={1.8} />}
-              value={form.jobTitle}
-              onChange={(e) => handleChange("jobTitle", e.target.value)}
-            />
-            <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
-              Dietary preferences
-              <select
-                value={form.dietaryRestrictions}
-                onChange={(e) => handleChange("dietaryRestrictions", e.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 focus:border-primary-400 focus:outline-none"
-              >
-                <option>None</option>
-                <option>Vegetarian</option>
-                <option>Vegan</option>
-                <option>Gluten-free</option>
-                <option>Halal</option>
-              </select>
-            </label>
-          </div>
-          <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
-            Notes for organizers
-            <textarea
-              rows={4}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 focus:border-primary-400 focus:outline-none"
-              value={form.note}
-              onChange={(e) => handleChange("note", e.target.value)}
-            />
-          </label>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm">
-            <p className="flex items-center gap-2 font-semibold text-slate-700">
-              <ShieldCheck className="h-4 w-4 text-primary-500" strokeWidth={1.8} /> Security Check
-            </p>
-            <div className="mt-3 flex items-center gap-3">
-              <span className="rounded-xl bg-white px-4 py-2 font-mono text-lg text-slate-900">{captcha?.prompt}</span>
+            <div className="mt-6 grid gap-4 text-sm text-white/80 sm:grid-cols-2">
+              <div>
+                <p className="uppercase text-white/60">Host contact</p>
+                <p className="font-semibold">{event?.contactEmail || "Shared after approval"}</p>
+                <p>{event?.contactPhone}</p>
+              </div>
+              <div>
+                <p className="uppercase text-white/60">Check-in notes</p>
+                <p>{event?.badgeMessaging || "Bring valid ID for entry."}</p>
+              </div>
+            </div>
+          </article>
+
+          <Card className="space-y-5 border border-slate-100/80 bg-white/95 p-6">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-slate-400">
+              <Ticket className="h-4 w-4" /> Availability
+            </div>
+            <div className="space-y-4">
+              {visibleTierData?.capacity ? (
+                <div>
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-slate-500">
+                    <span>{isOverflowView ? "Overflow quota" : "Main quota"}</span>
+                    <span>
+                      {visibleTierData.used}/{visibleTierData.capacity}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-slate-200">
+                    <div
+                      className={`h-full rounded-full ${isOverflowView ? "bg-amber-500" : "bg-primary-500"}`}
+                      style={{ width: `${visibleTierData.percent}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">{Math.max(visibleTierData.remaining ?? 0, 0)} spots left</p>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  {isOverflowView ? "Overflow" : "Main"} quota not configured.
+                </p>
+              )}
+              {!isOverflowView && quotaStats.overflow?.capacity > 0 && (
+                <p className="text-xs text-slate-500">
+                  Overflow seats live at a separate link once the main quota fills.
+                </p>
+              )}
+              {isOverflowView && quotaStats.main?.remaining > 0 && (
+                <p className="text-xs font-semibold text-amber-600">
+                  Main quota still has {quotaStats.main.remaining} spots. Hosts typically reserve overflow for later waves.
+                </p>
+              )}
+            </div>
+          </Card>
+
+          <Card className="space-y-4 border border-slate-100 bg-white/95 p-6">
+            <p className="text-sm font-semibold text-slate-800">Before you submit</p>
+            <ul className="space-y-3 text-sm text-slate-600">
+              {trustPoints.map((point) => (
+                <li key={point} className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary-500" strokeWidth={2} />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+
+        <section className="flex-1">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-6 rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_25px_70px_-40px_rgba(15,23,42,0.6)]"
+          >
+            <div className="flex items-center justify-between text-xs uppercase tracking-[0.35em] text-slate-400">
+              <span>Step 1 · RSVP Details</span>
+              <span>{event?.publicSlug}</span>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="Your answer"
-                icon={<ShieldCheck className="h-4 w-4" strokeWidth={1.8} />}
-                value={form.captchaAnswer}
-                onChange={(e) => handleChange("captchaAnswer", e.target.value)}
-                className="flex-1"
+                label="First name"
+                icon={<UserRound className="h-4 w-4" strokeWidth={1.8} />}
+                value={form.firstName}
+                onChange={(e) => handleChange("firstName", e.target.value)}
                 required
               />
+              <Input
+                label="Last name"
+                icon={<UserRound className="h-4 w-4" strokeWidth={1.8} />}
+                value={form.lastName}
+                onChange={(e) => handleChange("lastName", e.target.value)}
+                required
+              />
+            </div>
+            <Input
+              label="Email address"
+              type="email"
+              icon={<Mail className="h-4 w-4" strokeWidth={1.8} />}
+              value={form.email}
+              onChange={(e) => handleChange("email", e.target.value)}
+              required
+              hint="Confirmation and invite updates arrive here"
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Phone"
+                type="tel"
+                inputMode="tel"
+                icon={<Phone className="h-4 w-4" strokeWidth={1.8} />}
+                value={form.phone}
+                onChange={(e) => handleChange("phone", e.target.value)}
+                placeholder="+234 803 000 0000"
+                hint="Include country code (e.g. +234...)"
+              />
+              <Input
+                label="Role or title"
+                icon={<Briefcase className="h-4 w-4" strokeWidth={1.8} />}
+                value={form.jobTitle}
+                onChange={(e) => handleChange("jobTitle", e.target.value)}
+                hint="Optional"
+              />
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm">
+              <p className="flex items-center gap-2 font-semibold text-slate-700">
+                <ShieldCheck className="h-4 w-4 text-primary-500" strokeWidth={1.8} /> Quick security check
+              </p>
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <span className="rounded-2xl bg-white px-4 py-2 font-mono text-lg text-slate-900">{captcha?.prompt}</span>
+                <Input
+                  label="Answer"
+                  icon={<ShieldCheck className="h-4 w-4" strokeWidth={1.8} />}
+                  value={form.captchaAnswer}
+                  onChange={(e) => handleChange("captchaAnswer", e.target.value)}
+                  className="flex-1"
+                  required
+                />
                 <button
                   type="button"
                   onClick={refreshCaptcha}
@@ -304,23 +365,15 @@ export default function RegistrationPage() {
                 >
                   <RefreshCw className="h-4 w-4" strokeWidth={1.8} /> Refresh
                 </button>
+              </div>
             </div>
-          </div>
-          <label className="flex items-start gap-3 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-              checked={form.agree}
-              onChange={(e) => handleChange("agree", e.target.checked)}
-            />
-            I agree to the <a className="text-primary-600" href="#terms">Terms of Service</a> and <a className="text-primary-600" href="#privacy">Privacy Policy</a>.
-          </label>
-          {error && <p className="text-sm font-semibold text-danger">{error}</p>}
-          <Button type="submit" disabled={submitting} className="w-full justify-center">
-            {submitting ? "Submitting..." : "Secure my spot"}
-          </Button>
-        </form>
-      </section>
+            {error && <p className="text-sm font-semibold text-danger">{error}</p>}
+            <Button type="submit" disabled={submitting} className="w-full justify-center">
+              {submitting ? "Submitting..." : isOverflowView ? "Join overflow list" : "Request my invite"}
+            </Button>
+          </form>
+        </section>
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import Event from "../models/Event.js";
 
 export const DEFAULT_EVENT_SLUG = process.env.DEFAULT_EVENT_SLUG || "main-event";
@@ -42,15 +43,31 @@ export async function requireOrganizerEvent(adminId, eventId) {
   return event;
 }
 
-export async function generateUniqueSlug(preferred, excludeId) {
+const randomPrefix = (size = 4) => crypto.randomBytes(size).toString("hex").slice(0, size);
+
+export async function generateUniqueSlug(preferred, excludeId, options = {}) {
+  const { forcePrefixedSuggestion = false } = options;
   const base = normalizeSlug(preferred);
-  let slug = base;
-  let attempt = 1;
   const filter = excludeId ? { _id: { $ne: excludeId } } : {};
 
-  while (await Event.exists({ publicSlug: slug, ...filter })) {
-    slug = `${base}-${attempt++}`;
+  const baseAvailable = !(await Event.exists({ publicSlug: base, ...filter }));
+
+  if (baseAvailable && !forcePrefixedSuggestion) {
+    return base;
   }
+
+  let slug;
+  let attempt = 0;
+  do {
+    const prefix = randomPrefix();
+    slug = `${prefix}-${base}`;
+    attempt += 1;
+
+    if (attempt > 25) {
+      // fallback to timestamped prefix to avoid tight loop
+      slug = `${Date.now().toString(36)}-${base}`;
+    }
+  } while (await Event.exists({ publicSlug: slug, ...filter }));
 
   return slug;
 }

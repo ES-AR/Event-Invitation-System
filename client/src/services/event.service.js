@@ -17,6 +17,15 @@ export function createEvent(token, payload) {
   });
 }
 
+export function checkSlugAvailability(token, slug, eventId) {
+  const params = new URLSearchParams();
+  if (slug) params.set("slug", slug);
+  if (eventId) params.set("eventId", eventId);
+  const query = params.toString();
+  const suffix = query ? `?${query}` : "";
+  return apiClient(`/event/slug/check${suffix}`, { token });
+}
+
 export function getEvent(eventId, token) {
   return apiClient(`/event/${eventId}`, { token });
 }

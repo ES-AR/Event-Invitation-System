@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Copy, Link2, PenSquare, Power } from "lucide-react";
+import { Copy, Link2, PenSquare, Power, Trash2 } from "lucide-react";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import { useAuth } from "../../hooks/useAuth";
-import { closeRegistration, listEvents, openRegistration } from "../../services/event.service";
+import { closeRegistration, deleteEvent, listEvents, openRegistration } from "../../services/event.service";
 import { formatDateRange } from "../../utils/formatters";
 
 export default function EventsManagerPage() {
@@ -71,6 +71,21 @@ export default function EventsManagerPage() {
     }
   };
 
+  const handleDeleteEvent = async (eventId) => {
+    if (!token || !eventId) return;
+    const confirmed = window.confirm("Delete this event and all its registrations?");
+    if (!confirmed) return;
+    setUpdatingEventId(eventId);
+    try {
+      await deleteEvent(eventId, token);
+      setEvents((prev) => prev.filter((event) => event.id !== eventId));
+    } catch (err) {
+      console.error("Unable to delete event", err);
+    } finally {
+      setUpdatingEventId(null);
+    }
+  };
+
   const emptyState = !loading && events.length === 0;
 
   return (
@@ -111,11 +126,23 @@ export default function EventsManagerPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">{event.title}</p>
-                  <p className="text-xs text-slate-500">{formatDateRange(event.startDate, event.endDate) || "Schedule pending"}</p>
+                  <p className="text-xs text-slate-500">
+                    {formatDateRange(event.startDate, event.endDate, event.timezone || "UTC") || "Schedule pending"}
+                  </p>
                 </div>
-                <Badge tone={event.isRegistrationOpen ? "success" : "warning"}>
-                  {event.isRegistrationOpen ? "Live" : "Closed"}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge tone={event.isRegistrationOpen ? "success" : "warning"}>
+                    {event.isRegistrationOpen ? "Live" : "Closed"}
+                  </Badge>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteEvent(event.id)}
+                    className="inline-flex items-center gap-1 rounded-full bg-danger/10 px-3 py-1 text-xs font-semibold text-danger hover:bg-danger/20"
+                    disabled={updatingEventId === event.id}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} /> Delete
+                  </button>
+                </div>
               </div>
               <div>
                 <p className="pill-label">

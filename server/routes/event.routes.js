@@ -10,6 +10,7 @@ import {
   openRegistration,
   getEventStats,
   getPublicEvent,
+  checkSlugAvailability,
 } from "../controllers/event.controller.js";
 import requireAdmin from "../middleware/requireAdmin.js";
 
@@ -17,6 +18,7 @@ const router = express.Router();
 
 router.get("/public", getPublicEvent);
 router.get("/public/:slug", getPublicEvent);
+router.get("/slug/check", requireAdmin, checkSlugAvailability);
 
 router.get("/", requireAdmin, listOrganizerEvents);
 router.post("/", requireAdmin, createEvent);
