@@ -1,3 +1,4 @@
+// Event.js
 import mongoose from "mongoose";
 
 const eventSchema = new mongoose.Schema(
@@ -10,6 +11,8 @@ const eventSchema = new mongoose.Schema(
     title: { type: String, default: "Quota-Controlled Event" },
     description: { type: String, default: "" },
     location: { type: String, default: "" },
+    locationLatitude: { type: Number},
+    locationLongitude: { type: Number},
     venueName: { type: String, default: "" },
     venueAddress: { type: String, default: "" },
     startDate: { type: Date, default: null },

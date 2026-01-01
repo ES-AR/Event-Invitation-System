@@ -14,6 +14,7 @@ import {
   openRegistration,
   updateEvent,
 } from "../../services/event.service";
+import LocationPicker from "./components/LocationPicker";
 
 const localTimeZone = Intl?.DateTimeFormat?.().resolvedOptions?.().timeZone || "UTC";
 const timezoneCatalog = [
@@ -38,6 +39,8 @@ const defaultEvent = {
   description: "",
   venueName: "",
   location: "",
+  locationLatitude: null,
+  locationLongitude: null,
   venueAddress: "",
   startDate: "",
   startTime: "",
@@ -133,6 +136,8 @@ const hydrateForm = (event = defaultEvent) => {
   return {
     ...defaultEvent,
     ...event,
+    locationLatitude: event.locationLatitude ?? null,
+    locationLongitude: event.locationLongitude ?? null,
     timezone: timeZone,
     startDate: formatDateForInput(event.startDate, timeZone),
     startTime: formatTimeForInput(event.startDate, timeZone),
@@ -300,7 +305,7 @@ export default function EventBuilderPage() {
     } = form;
     const resolvedTimeZone = timezone || localTimeZone;
 
-    return {
+    const builtPayload = {
       ...payload,
       timezone: resolvedTimeZone,
       startDate: combineDateTime(payload.startDate, startTime, resolvedTimeZone),
@@ -313,6 +318,16 @@ export default function EventBuilderPage() {
       maxMainSlots: Number(payload.maxMainSlots) || 0,
       maxOverflowSlots: Number(payload.maxOverflowSlots) || 0,
     };
+
+    if (builtPayload.locationLatitude !== null && builtPayload.locationLatitude !== undefined) {
+      builtPayload.locationLatitude = Number(builtPayload.locationLatitude);
+    }
+
+    if (builtPayload.locationLongitude !== null && builtPayload.locationLongitude !== undefined) {
+      builtPayload.locationLongitude = Number(builtPayload.locationLongitude);
+    }
+
+    return builtPayload;
   };
 
   const handleSubmit = async (e) => {
@@ -440,9 +455,21 @@ export default function EventBuilderPage() {
             </label>
             <div className="grid gap-4 md:grid-cols-2">
               <Input label="Venue name" value={form.venueName} onChange={(e) => handleChange("venueName", e.target.value)} />
-              <Input label="City / Location" value={form.location} onChange={(e) => handleChange("location", e.target.value)} />
+              <Input label="Venue address" value={form.venueAddress} onChange={(e) => handleChange("venueAddress", e.target.value)} />
             </div>
-            <Input label="Address" value={form.venueAddress} onChange={(e) => handleChange("venueAddress", e.target.value)} />
+            <LocationPicker
+              token={token}
+              value={{
+                label: form.location,
+                latitude: form.locationLatitude,
+                longitude: form.locationLongitude,
+              }}
+              onChange={(next) => {
+                handleChange("location", next.label || "");
+                handleChange("locationLatitude", next.latitude ?? null);
+                handleChange("locationLongitude", next.longitude ?? null);
+              }}
+            />
             <div className="grid gap-4 md:grid-cols-2">
               <Input label="Start date" type="date" value={form.startDate} onChange={(e) => handleChange("startDate", e.target.value)} />
               <Input label="End date" type="date" value={form.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />

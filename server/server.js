@@ -1,5 +1,5 @@
+import "dotenv/config";
 import express from "express";
-import dotenv from "dotenv";
 import mongoose from "mongoose";
 import cors from "cors";
 import helmet from "helmet";
@@ -13,10 +13,8 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import eventRoutes from "./routes/event.routes.js";
 import registrationRoutes from "./routes/registration.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import geocodeRoutes from "./routes/geocode.routes.js";
 import { seedDefaultAdmin } from "./utils/seedAdmin.js";
-
-// Load env
-dotenv.config();
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -41,6 +39,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/auth", authRoutes);
 app.use("/api/event", eventRoutes);
 app.use("/api/registration", registrationRoutes);
+app.use("/api/geocode", geocodeRoutes);
 
 // Root
 app.get("/", (req, res) => {

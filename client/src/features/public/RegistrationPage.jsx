@@ -20,6 +20,7 @@ import Card from "../../components/ui/Card";
 import { getPublicEvent } from "../../services/event.service";
 import { requestCaptcha, submitRegistration } from "../../services/registration.service";
 import { formatDateRange } from "../../utils/formatters";
+import EventLocationMap from "./components/EventLocationMap";
 
 const initialForm = {
   firstName: "",
@@ -238,6 +239,17 @@ export default function RegistrationPage() {
               </div>
             </div>
           </article>
+
+          {typeof event?.locationLatitude === "number" && typeof event?.locationLongitude === "number" && (
+            <Card className="border border-slate-100/80 bg-white/95 p-6">
+              <EventLocationMap
+                title={event?.title}
+                address={event?.venueAddress || event?.location}
+                latitude={event.locationLatitude}
+                longitude={event.locationLongitude}
+              />
+            </Card>
+          )}
 
           <Card className="space-y-5 border border-slate-100/80 bg-white/95 p-6">
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-slate-400">
