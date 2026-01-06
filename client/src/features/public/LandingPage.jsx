@@ -20,7 +20,7 @@ import Card from "../../components/ui/Card";
 const heroStats = [
   { label: "Events built", value: "12,480" },
   { label: "Hosts worldwide", value: "83 countries" },
-  { label: "Guests checked in", value: "1.4M+" },
+  { label: "Guests approved", value: "1.4M+" },
 ];
 
 const featureCards = [
@@ -36,7 +36,7 @@ const featureCards = [
   },
   {
     title: "Real-time signals",
-    copy: "Watch approvals, check-ins, and attendance health update like a live scoreboard.",
+    copy: "Watch approvals and quota health update like a live scoreboard.",
     icon: Sparkles,
   },
   {
@@ -64,7 +64,7 @@ const timeline = [
   },
   {
     title: "Welcome guests in style",
-    detail: "Self-serve check-ins with photo verification keep entrances smooth and secure.",
+    detail: "Auto emails share arrival details while staff rely on the RSVP photo you captured.",
     icon: Compass,
   },
 ];
@@ -95,7 +95,7 @@ export default function LandingPage() {
             Launch modern invite sites for every gathering—studio openings, weddings, hackathons, you name it.
           </h1>
           <p className="text-base text-white/80">
-            EventQuota gives solo hosts and teams the same tooling: branded RSVP pages, quota automation, and instant check-in links
+            EventQuota gives solo hosts and teams the same tooling: branded RSVP pages, quota automation, and instant approval emails
             that feel premium on any device.
           </p>
           <div className="flex flex-wrap gap-4">
@@ -126,7 +126,7 @@ export default function LandingPage() {
             <p className="text-sm text-white/70">Brooklyn · Slots left: 18</p>
             <div className="mt-5 flex flex-wrap gap-3 text-xs">
               <span className="rounded-full bg-white/15 px-3 py-1">Auto approvals on</span>
-              <span className="rounded-full bg-white/15 px-3 py-1">Photo check-in enforced</span>
+              <span className="rounded-full bg-white/15 px-3 py-1">Photo identity on file</span>
               <span className="rounded-full bg-white/15 px-3 py-1">Share link copied</span>
             </div>
           </div>

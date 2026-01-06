@@ -7,10 +7,9 @@ import {
   Mail,
   MapPin,
   Phone,
-  RefreshCw,
-  ShieldCheck,
   Sparkles,
   Ticket,
+  UploadCloud,
   UserRound,
 } from "lucide-react";
 import Button from "../../components/ui/Button";
@@ -18,7 +17,7 @@ import Input from "../../components/ui/Input";
 import Badge from "../../components/ui/Badge";
 import Card from "../../components/ui/Card";
 import { getPublicEvent } from "../../services/event.service";
-import { requestCaptcha, submitRegistration } from "../../services/registration.service";
+import { submitRegistration } from "../../services/registration.service";
 import { formatDateRange } from "../../utils/formatters";
 import EventLocationMap from "./components/EventLocationMap";
 
@@ -28,13 +27,12 @@ const initialForm = {
   email: "",
   phone: "",
   jobTitle: "",
-  captchaAnswer: "",
 };
 
 const trustPoints = [
   "Duplicate detection keeps your invite unique.",
   "Hosts may approve RSVP before sharing directions.",
-  "Photo check-in protects every entrance queue.",
+  "Photo ID is captured with your RSVP so approvals move faster.",
 ];
 
 export default function RegistrationPage() {
@@ -44,24 +42,21 @@ export default function RegistrationPage() {
   const activeTier = tierParam === "overflow" ? "overflow" : "main";
   const isOverflowView = activeTier === "overflow";
   const [event, setEvent] = useState(null);
-  const [captcha, setCaptcha] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
     async function load() {
       try {
-        const [{ event: eventData }, captchaData] = await Promise.all([
-          getPublicEvent(slug),
-          requestCaptcha(),
-        ]);
+        const { event: eventData } = await getPublicEvent(slug);
         if (isMounted) {
           setEvent(eventData);
-          setCaptcha(captchaData);
           setError(null);
         }
       } catch (err) {
@@ -87,6 +82,28 @@ export default function RegistrationPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handlePhotoChange = (file) => {
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview);
+    }
+    if (!file) {
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      return;
+    }
+    const nextPreview = URL.createObjectURL(file);
+    setPhotoFile(file);
+    setPhotoPreview(nextPreview);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (photoPreview) {
+        URL.revokeObjectURL(photoPreview);
+      }
+    };
+  }, [photoPreview]);
+
   const quotaStats = useMemo(() => {
     const main = event?.quota?.main || { capacity: 0, used: 0, remaining: 0 };
     const overflow = event?.quota?.overflow || { capacity: 0, used: 0, remaining: 0 };
@@ -101,18 +118,8 @@ export default function RegistrationPage() {
   }, [event]);
   const visibleTierData = isOverflowView ? quotaStats.overflow : quotaStats.main;
 
-  const refreshCaptcha = async () => {
-    const updated = await requestCaptcha();
-    setCaptcha(updated);
-    handleChange("captchaAnswer", "");
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!captcha?.token) {
-      setError("Captcha expired. Please refresh and try again.");
-      return;
-    }
     if (!event) {
       setError("Event details are still loading. Try again.");
       return;
@@ -142,23 +149,33 @@ export default function RegistrationPage() {
       }
     }
 
+    if (!photoFile) {
+      setError("Please upload a photo to continue.");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
     try {
-      const payload = {
-        ...form,
-        fullName: `${form.firstName} ${form.lastName}`.trim(),
-        captchaToken: captcha.token,
-        slug: slug || event?.publicSlug,
-        ticketTier: isOverflowView ? "Overflow" : "Main",
-        dietaryRestrictions: "None",
-      };
-      const { message, registration } = await submitRegistration(payload);
+      const formData = new FormData();
+      formData.append("firstName", form.firstName);
+      formData.append("lastName", form.lastName);
+      formData.append("fullName", `${form.firstName} ${form.lastName}`.trim());
+      formData.append("email", form.email);
+      formData.append("phone", form.phone);
+      formData.append("jobTitle", form.jobTitle);
+      formData.append("slug", slug || event?.publicSlug);
+      formData.append("ticketTier", isOverflowView ? "Overflow" : "Main");
+      formData.append("dietaryRestrictions", "None");
+      formData.append("note", "");
+      formData.append("photo", photoFile);
+      const { message, registration } = await submitRegistration(formData);
       setStatus({ message, registration });
+      setForm(initialForm);
+      handlePhotoChange(null);
     } catch (err) {
       setError(err.message || "Registration failed");
-      refreshCaptcha();
     } finally {
       setSubmitting(false);
     }
@@ -185,6 +202,7 @@ export default function RegistrationPage() {
           <p className="text-xs uppercase tracking-[0.4em] text-white/70">Registration confirmed</p>
           <h2 className="mt-4 text-3xl font-semibold">Thanks, {status.registration?.fullName}!</h2>
           <p className="mt-2 text-sm text-white/80">{status.message}</p>
+          <p className="text-xs text-white/70">If your event requires approval, the full details will arrive via email as soon as a host reviews your RSVP.</p>
           <div className="mt-8 grid gap-4 text-sm">
             <div className="rounded-2xl border border-white/20 bg-white/10 p-4">
               <p className="font-semibold">Invite link</p>
@@ -234,7 +252,7 @@ export default function RegistrationPage() {
                 <p>{event?.contactPhone}</p>
               </div>
               <div>
-                <p className="uppercase text-white/60">Check-in notes</p>
+                <p className="uppercase text-white/60">Arrival notes</p>
                 <p>{event?.badgeMessaging || "Bring valid ID for entry."}</p>
               </div>
             </div>
@@ -356,28 +374,32 @@ export default function RegistrationPage() {
                 hint="Optional"
               />
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm">
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-5 text-sm">
               <p className="flex items-center gap-2 font-semibold text-slate-700">
-                <ShieldCheck className="h-4 w-4 text-primary-500" strokeWidth={1.8} /> Quick security check
+                <UploadCloud className="h-4 w-4 text-primary-500" strokeWidth={1.8} /> Photo verification
               </p>
-              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <span className="rounded-2xl bg-white px-4 py-2 font-mono text-lg text-slate-900">{captcha?.prompt}</span>
-                <Input
-                  label="Answer"
-                  icon={<ShieldCheck className="h-4 w-4" strokeWidth={1.8} />}
-                  value={form.captchaAnswer}
-                  onChange={(e) => handleChange("captchaAnswer", e.target.value)}
-                  className="flex-1"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={refreshCaptcha}
-                  className="inline-flex items-center gap-1 text-sm font-semibold text-primary-600"
-                >
-                  <RefreshCw className="h-4 w-4" strokeWidth={1.8} /> Refresh
-                </button>
-              </div>
+              <p className="mt-1 text-xs text-slate-500">Upload a clear headshot (PNG or JPG, max 5MB). This is shared with the host for on-site validation.</p>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                id="attendee-photo-input"
+                onChange={(e) => handlePhotoChange(e.target.files?.[0] || null)}
+              />
+              <label
+                htmlFor="attendee-photo-input"
+                className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-primary-700"
+              >
+                <UploadCloud className="h-4 w-4" strokeWidth={1.8} /> {photoFile ? "Replace photo" : "Upload photo"}
+              </label>
+              {photoPreview && (
+                <div className="mt-4 flex flex-col items-center gap-2">
+                  <img src={photoPreview} alt="RSVP preview" className="h-32 w-32 rounded-2xl object-cover shadow-sm" />
+                  <button type="button" className="text-xs font-semibold text-danger" onClick={() => handlePhotoChange(null)}>
+                    Remove photo
+                  </button>
+                </div>
+              )}
             </div>
             {error && <p className="text-sm font-semibold text-danger">{error}</p>}
             <Button type="submit" disabled={submitting} className="w-full justify-center">

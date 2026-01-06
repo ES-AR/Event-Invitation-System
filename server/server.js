@@ -21,7 +21,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Middlewares
-const FRONTEND_ORIGIN = process.env.FRONTEND_URL || "http://localhost:5173";
+const FRONTEND_ORIGIN = process.env.FRONTEND_URL || "http://localhost:5174";
 app.use(
   cors({
     origin: FRONTEND_ORIGIN,

@@ -13,8 +13,8 @@ import { formatNumber } from "../../utils/formatters";
 const statusTone = {
   approved: "success",
   pending: "warning",
-  "checked-in": "info",
   rejected: "danger",
+  cancelled: "neutral",
 };
 
 export default function RegistrationsPage() {
@@ -178,7 +178,8 @@ export default function RegistrationsPage() {
                 <option value="">All</option>
                 <option value="approved">Approved</option>
                 <option value="pending">Pending</option>
-                <option value="checked-in">Checked-in</option>
+                <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </label>
             <Button onClick={() => load()} className="self-end">

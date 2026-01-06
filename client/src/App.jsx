@@ -4,7 +4,6 @@ import PublicShell from "./components/layout/PublicShell";
 import AdminShell from "./components/layout/AdminShell";
 import LandingPage from "./features/public/LandingPage";
 import RegistrationPage from "./features/public/RegistrationPage";
-import CheckInPage from "./features/public/CheckInPage";
 import OrganizerLogin from "./features/auth/OrganizerLogin";
 import OrganizerRegister from "./features/auth/OrganizerRegister";
 import DashboardPage from "./features/admin/DashboardPage";
@@ -20,7 +19,6 @@ export default function App() {
           <Route element={<PublicShell />}>
             <Route path="/" element={<LandingPage />} />
             <Route path="/invite/:slug" element={<RegistrationPage />} />
-            <Route path="/check-in" element={<CheckInPage />} />
           </Route>
 
           <Route path="/admin/login" element={<OrganizerLogin />} />

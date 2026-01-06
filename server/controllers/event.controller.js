@@ -228,13 +228,14 @@ export const getEventStats = async (req, res) => {
   try {
     const event = await applyAutoClose(await requireOrganizerEvent(req.admin._id, req.params.eventId));
 
-    const [pending, approved, checkedIn, cancelled, mainCount, overflowCount] = await Promise.all([
+    const activeSlotFilter = { $nin: ["cancelled", "rejected"] };
+    const [pending, approved, cancelled, rejected, mainCount, overflowCount] = await Promise.all([
       Registration.countDocuments({ event: event._id, status: "pending" }),
       Registration.countDocuments({ event: event._id, status: "approved" }),
-      Registration.countDocuments({ event: event._id, status: "checked-in" }),
       Registration.countDocuments({ event: event._id, status: "cancelled" }),
-      Registration.countDocuments({ event: event._id, slotType: "main" }),
-      Registration.countDocuments({ event: event._id, slotType: "overflow" }),
+      Registration.countDocuments({ event: event._id, status: "rejected" }),
+      Registration.countDocuments({ event: event._id, slotType: "main", status: activeSlotFilter }),
+      Registration.countDocuments({ event: event._id, slotType: "overflow", status: activeSlotFilter }),
     ]);
 
     res.json({
@@ -242,8 +243,8 @@ export const getEventStats = async (req, res) => {
       totals: {
         pending,
         approved,
-        checkedIn,
         cancelled,
+        rejected,
       },
       slots: {
         main: {

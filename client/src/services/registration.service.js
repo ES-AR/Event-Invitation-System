@@ -1,13 +1,11 @@
 import { apiClient } from "./apiClient";
 
-export function requestCaptcha() {
-  return apiClient("/registration/captcha");
-}
-
 export function submitRegistration(payload) {
+  const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
   return apiClient("/registration", {
     method: "POST",
     data: payload,
+    isFormData,
   });
 }
 
@@ -48,14 +46,3 @@ export function bulkDelete(body, token) {
   });
 }
 
-export function getCheckInDetails(token) {
-  return apiClient(`/registration/checkin/${token}`);
-}
-
-export function submitCheckIn(token, payload) {
-  return apiClient(`/registration/checkin/${token}`, {
-    method: "POST",
-    data: payload,
-    isFormData: true,
-  });
-}

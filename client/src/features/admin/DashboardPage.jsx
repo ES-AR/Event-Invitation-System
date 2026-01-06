@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Clock9, Copy, Link2, UserCheck, Users } from "lucide-react";
+import { Clock9, Copy, Link2, UserCheck, UserX } from "lucide-react";
 import Card from "../../components/ui/Card";
 import QuotaMeter from "../../components/ui/QuotaMeter";
 import Button from "../../components/ui/Button";
@@ -10,9 +10,9 @@ import { getEventStats, listEvents } from "../../services/event.service";
 import { formatDateRange } from "../../utils/formatters";
 
 const statConfig = [
-  { key: "approved", label: "Total Registrations", icon: Users },
-  { key: "checkedIn", label: "Checked-in", icon: UserCheck },
+  { key: "approved", label: "Approved RSVPs", icon: UserCheck },
   { key: "pending", label: "Pending Reviews", icon: Clock9 },
+  { key: "cancelled", label: "Cancelled", icon: UserX },
 ];
 
 export default function DashboardPage() {
@@ -220,8 +220,8 @@ export default function DashboardPage() {
                     <QuotaMeter label="Overflow" used={stats?.slots?.overflow?.used} capacity={stats?.slots?.overflow?.capacity} accent="from-violet-500 to-purple-400" />
                   </div>
                   <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-sm text-slate-600">
-                    <p className="font-semibold text-slate-800">Check-in instructions</p>
-                    <p className="mt-2">{selectedEvent?.checkInInstructions || "Remind guests to bring government ID."}</p>
+                    <p className="font-semibold text-slate-800">Guest instructions</p>
+                    <p className="mt-2">{selectedEvent?.checkInInstructions || "Share arrival notes and ID requirements here."}</p>
                   </div>
                 </>
               )}

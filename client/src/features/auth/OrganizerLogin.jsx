@@ -6,7 +6,7 @@ import Input from "../../components/ui/Input";
 import { useAuth } from "../../hooks/useAuth";
 
 export default function OrganizerLogin() {
-  const { login, error } = useAuth();
+  const { login, error: authError } = useAuth();
   const [form, setForm] = useState({ email: "", password: "", remember: true });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
@@ -15,6 +15,9 @@ export default function OrganizerLogin() {
 
   const handleChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (formError) {
+      setFormError(null);
+    }
   };
 
   const togglePasswordVisibility = () => {
@@ -42,7 +45,7 @@ export default function OrganizerLogin() {
           <p className="text-xs uppercase tracking-[0.35em] text-white/70">EventQuota</p>
           <h1 className="mt-4 font-display text-4xl">Organizer Login</h1>
           <p className="mt-3 max-w-md text-white/80">
-            Sign back in to edit events, approve guests, and monitor check-ins—all from your personal dashboard.
+            Sign back in to edit events, approve guests, and monitor approvals—all from your personal dashboard.
           </p>
         </div>
         <div className="rounded-3xl bg-white/10 p-6 text-white backdrop-blur">
@@ -72,6 +75,7 @@ export default function OrganizerLogin() {
             onChange={(e) => handleChange("password", e.target.value)}
             required
             icon={<Lock className="h-4 w-4" strokeWidth={1.8} />}
+            error={formError || authError}
             rightSlot={
               <button
                 type="button"
@@ -97,7 +101,7 @@ export default function OrganizerLogin() {
               Forgot password?
             </a>
           </div>
-          {(formError || error) && <p className="text-sm font-semibold text-danger">{formError || error}</p>}
+          {(formError || authError) && <p className="text-sm font-semibold text-danger">{formError || authError}</p>}
           <Button type="submit" disabled={submitting} className="w-full justify-center">
             {submitting ? "Signing in..." : "Log In"}
           </Button>

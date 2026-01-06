@@ -1,32 +1,24 @@
 import fs from "fs";
-import { v4 as uuidv4 } from "uuid";
 import { Parser } from "json2csv";
 import PDFDocument from "pdfkit";
 import Registration from "../models/Registration.js";
 import Event from "../models/Event.js";
 import { normalizeSlug, requireOrganizerEvent } from "../utils/eventSetup.js";
 import { applyAutoClose } from "../utils/eventStatus.js";
-import { sendCheckInEmail } from "../services/email.service.js";
-import {
-  createCaptchaChallenge,
-  verifyCaptchaResponse,
-} from "../utils/captcha.js";
-
-const FRONTEND_ORIGIN = process.env.FRONTEND_URL || "http://localhost:5173";
-
-const buildCheckInLink = (token) => `${FRONTEND_ORIGIN}/check-in?token=${token}`;
+import { sendEventApprovalEmail } from "../services/email.service.js";
 
 const slotCountsForEvent = async (eventId) => {
+  const activeFilter = { $nin: ["cancelled", "rejected"] };
   return Promise.all([
     Registration.countDocuments({
       event: eventId,
       slotType: "main",
-      status: { $ne: "cancelled" },
+      status: activeFilter,
     }),
     Registration.countDocuments({
       event: eventId,
       slotType: "overflow",
-      status: { $ne: "cancelled" },
+      status: activeFilter,
     }),
   ]);
 };
@@ -44,33 +36,34 @@ const pushStatusHistory = (attendee, status, note = "") => {
   attendee.statusHistory.push({ status, note, changedAt: new Date() });
 };
 
-export const getCaptchaChallenge = (req, res) => {
-  const challenge = createCaptchaChallenge();
-  res.json(challenge);
-};
-
 export const registerUser = async (req, res) => {
+  let registrationCreated = false;
+  const abort = (status, payload) => {
+    cleanupUploadedFile(req.file);
+    return res.status(status).json(payload);
+  };
+
   try {
     const slug = req.body.slug ? normalizeSlug(req.body.slug) : null;
     if (!slug) {
-      return res.status(400).json({ message: "Missing event invite" });
+      return abort(400, { message: "Missing event invite" });
     }
 
     const event = await Event.findOne({ publicSlug: slug });
     if (!event) {
-      return res.status(404).json({ message: "Event not found" });
+      return abort(404, { message: "Event not found" });
     }
 
     await applyAutoClose(event);
 
     if (!event.publicInviteEnabled) {
-      return res.status(403).json({
+      return abort(403, {
         message: "This event is not accepting public registrations",
       });
     }
 
     if (!event.isRegistrationOpen) {
-      return res.status(400).json({
+      return abort(400, {
         message: event.closeReason || "Registration is currently closed",
       });
     }
@@ -86,15 +79,10 @@ export const registerUser = async (req, res) => {
       dietaryRestrictions = "None",
       ticketTier = "Main",
       note = "",
-      captchaToken,
-      captchaAnswer,
     } = req.body;
 
-    if (!verifyCaptchaResponse(captchaToken, captchaAnswer)) {
-      return res.status(400).json({
-        message: "Captcha verification failed",
-        code: "CAPTCHA_INVALID",
-      });
+    if (!req.file) {
+      return abort(400, { message: "Attendee photo is required" });
     }
 
     const safeFirst = firstName.trim();
@@ -102,14 +90,14 @@ export const registerUser = async (req, res) => {
     const normalizedName = (fullName || `${safeFirst} ${safeLast}`.trim()).trim();
 
     if (!normalizedName || !email) {
-      return res.status(400).json({ message: "Full name and email are required" });
+      return abort(400, { message: "Full name and email are required" });
     }
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPhone = phone.trim();
     const existing = await Registration.findOne({ event: event._id, email: normalizedEmail });
 
     if (existing) {
-      return res.status(409).json({
+      return abort(409, {
         message: "You have already registered for this event",
         code: "DUPLICATE_REGISTRATION",
         registration: {
@@ -117,8 +105,6 @@ export const registerUser = async (req, res) => {
           email: existing.email,
           slotType: existing.slotType,
           status: existing.status,
-          checkedIn: existing.checkedIn,
-          checkInToken: existing.checkInToken,
         },
       });
     }
@@ -131,31 +117,28 @@ export const registerUser = async (req, res) => {
 
     if (wantsOverflow) {
       if (!overflowCapacity) {
-        return res.status(400).json({ message: "Overflow registration is not enabled for this event." });
+        return abort(400, { message: "Overflow registration is not enabled for this event." });
       }
       if (mainCount < event.maxMainSlots) {
-        return res.status(400).json({
+        return abort(400, {
           message: "Main quota still has space. Use the primary registration link.",
           code: "MAIN_AVAILABLE",
         });
       }
       if (overflowCount >= overflowCapacity) {
-        return res.status(400).json({ message: "Overflow slots are currently full" });
+        return abort(400, { message: "Overflow slots are currently full" });
       }
       slotType = "overflow";
-    } else {
-      if (mainCount >= event.maxMainSlots) {
-        return res.status(400).json({
-          message: "Main quota is full. Request the overflow link from your host.",
-          code: "MAIN_FULL",
-        });
-      }
-      slotType = "main";
+    } else if (mainCount >= event.maxMainSlots) {
+      return abort(400, {
+        message: "Main quota is full. Request the overflow link from your host.",
+        code: "MAIN_FULL",
+      });
     }
 
     const status = event.requiresApproval ? "pending" : "approved";
     const isApproved = status === "approved";
-    const checkInToken = isApproved ? uuidv4() : null;
+    const photoUrl = `/uploads/attendees/${req.file.filename}`;
 
     const registration = await Registration.create({
       event: event._id,
@@ -172,7 +155,7 @@ export const registerUser = async (req, res) => {
       slotType,
       status,
       isApproved,
-      checkInToken,
+      photoUrl,
       statusHistory: [
         {
           status,
@@ -181,14 +164,25 @@ export const registerUser = async (req, res) => {
         },
       ],
     });
+    registrationCreated = true;
+
+    if (isApproved) {
+      const emailResult = await sendEventApprovalEmail(registration, event);
+      if (!emailResult.sent) {
+        console.warn("Approval email failed for", registration.email, emailResult.reason);
+      }
+    }
 
     const message =
       status === "approved"
-        ? "Registration confirmed — you have a spot!"
+        ? "Registration confirmed — event details are on the way to your inbox."
         : "Registration received. Await approval email.";
 
     res.status(201).json({ message, registration });
   } catch (err) {
+    if (!registrationCreated) {
+      cleanupUploadedFile(req.file);
+    }
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
@@ -264,7 +258,7 @@ export const getSingleAttendee = async (req, res) => {
 
 export const approveAttendee = async (req, res) => {
   try {
-    const attendee = await Registration.findById(req.params.id).populate("event", "organizer");
+    const attendee = await Registration.findById(req.params.id).populate("event");
 
     if (!attendee || !attendee.event || String(attendee.event.organizer) !== String(req.admin._id)) {
       return res.status(404).json({ message: "Attendee not found" });
@@ -272,14 +266,18 @@ export const approveAttendee = async (req, res) => {
 
     attendee.status = "approved";
     attendee.isApproved = true;
-    attendee.checkInToken = attendee.checkInToken || uuidv4();
     pushStatusHistory(attendee, "approved", "Approved manually");
     await attendee.save();
+
+    const emailResult = attendee.event
+      ? await sendEventApprovalEmail(attendee, attendee.event)
+      : { sent: false, reason: "Event missing" };
 
     res.json({
       message: "Attendee approved",
       attendee,
-      checkInUrl: buildCheckInLink(attendee.checkInToken),
+      emailSent: emailResult.sent,
+      emailError: emailResult.sent ? null : emailResult.reason,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -302,141 +300,10 @@ export const deleteAttendee = async (req, res) => {
   }
 };
 
-export const sendCheckInLink = async (req, res) => {
-  try {
-    const attendee = await Registration.findById(req.params.id).populate("event", "organizer");
-
-    if (!attendee || !attendee.event || String(attendee.event.organizer) !== String(req.admin._id)) {
-      return res.status(404).json({ message: "Attendee not found" });
-    }
-
-    if (!attendee.isApproved) {
-      return res.status(400).json({ message: "Approve attendee before sending link" });
-    }
-
-    attendee.checkInToken = attendee.checkInToken || uuidv4();
-    await attendee.save();
-
-    const checkInUrl = buildCheckInLink(attendee.checkInToken);
-    const emailResult = await sendCheckInEmail(attendee, checkInUrl);
-
-    res.json({
-      message: emailResult.sent
-        ? "Check-in link emailed to attendee"
-        : "Check-in link generated",
-      checkInUrl,
-      emailSent: emailResult.sent,
-      emailError: emailResult.sent ? null : emailResult.reason,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-export const getCheckInDetails = async (req, res) => {
-  try {
-    const attendee = await Registration.findOne({
-      checkInToken: req.params.token,
-    }).populate("event");
-
-    if (!attendee) {
-      cleanupUploadedFile(req.file);
-      return res.status(404).json({ message: "Invalid or expired check-in link" });
-    }
-
-    res.json({
-      attendee: {
-        fullName: attendee.fullName,
-        email: attendee.email,
-        phone: attendee.phone,
-        slotType: attendee.slotType,
-        status: attendee.status,
-        checkedIn: attendee.checkedIn,
-        checkInTime: attendee.checkInTime,
-      },
-      event: attendee.event
-        ? {
-            title: attendee.event.title,
-            location: attendee.event.location,
-            startDate: attendee.event.startDate,
-            badgeMessaging: attendee.event.badgeMessaging,
-          }
-        : null,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-export const checkInAttendee = async (req, res) => {
-  try {
-    const attendee = await Registration.findOne({
-      checkInToken: req.params.token,
-    }).populate("event");
-
-    if (!attendee) {
-      return res.status(404).json({ message: "Invalid or expired check-in link" });
-    }
-
-    if (attendee.checkedIn) {
-      cleanupUploadedFile(req.file);
-      return res.status(400).json({ message: "Attendee already checked in" });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ message: "Photo upload is required" });
-    }
-
-    const { fullName, email, phone } = req.body;
-    const normalizedFullName = (fullName || "").trim().toLowerCase();
-    const normalizedEmail = (email || "").trim().toLowerCase();
-    const normalizedPhone = (phone || "").trim();
-
-    const matches =
-      (attendee.fullName.trim().toLowerCase() === normalizedFullName ? 1 : 0) +
-      (attendee.email === normalizedEmail ? 1 : 0) +
-      (attendee.phone === normalizedPhone ? 1 : 0);
-
-    if (matches < 2) {
-      cleanupUploadedFile(req.file);
-      return res.status(400).json({
-        message: "Identity verification failed. Details do not match.",
-      });
-    }
-
-    attendee.checkedIn = true;
-    attendee.status = "checked-in";
-    attendee.checkInPhoto = `/uploads/checkins/${req.file.filename}`;
-    attendee.checkInTime = new Date();
-    pushStatusHistory(attendee, "checked-in", "Self check-in completed");
-
-    await attendee.save();
-
-    res.json({
-      message: "Check-in successful",
-      attendee: {
-        fullName: attendee.fullName,
-        slotType: attendee.slotType,
-        status: attendee.status,
-        checkInTime: attendee.checkInTime,
-        checkInPhoto: attendee.checkInPhoto,
-      },
-      event: attendee.event
-        ? {
-            title: attendee.event.title,
-            startDate: attendee.event.startDate,
-          }
-        : null,
-    });
-  } catch (err) {
-    cleanupUploadedFile(req.file);
-    res.status(500).json({ message: err.message });
-  }
-};
 
 export const bulkApproveAttendees = async (req, res) => {
   try {
-    const { ids = [], sendEmails = false, eventId } = req.body;
+    const { ids = [], eventId } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ message: "Provide attendee ids" });
     }
@@ -452,19 +319,15 @@ export const bulkApproveAttendees = async (req, res) => {
     for (const attendee of attendees) {
       attendee.status = "approved";
       attendee.isApproved = true;
-      attendee.checkInToken = attendee.checkInToken || uuidv4();
       pushStatusHistory(attendee, "approved", "Bulk approval");
       await attendee.save();
 
       let emailSent = false;
       let emailError = null;
 
-      if (sendEmails) {
-        const checkInUrl = buildCheckInLink(attendee.checkInToken);
-        const emailResult = await sendCheckInEmail(attendee, checkInUrl);
-        emailSent = emailResult.sent;
-        emailError = emailResult.sent ? null : emailResult.reason;
-      }
+      const emailResult = await sendEventApprovalEmail(attendee, event);
+      emailSent = emailResult.sent;
+      emailError = emailResult.sent ? null : emailResult.reason;
 
       results.push({
         id: attendee._id,

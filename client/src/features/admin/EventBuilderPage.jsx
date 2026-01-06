@@ -599,10 +599,10 @@ export default function EventBuilderPage() {
 
           <Card className="space-y-4">
             <p className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
-              <ShieldCheck className="h-4 w-4 text-primary-600" strokeWidth={1.8} /> Check-in guidance
+              <ShieldCheck className="h-4 w-4 text-primary-600" strokeWidth={1.8} /> Guest guidance
             </p>
             <label className="text-sm font-medium text-slate-700">
-              Instructions for staff
+              Arrival instructions for staff/guests
               <textarea
                 className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3"
                 rows={3}

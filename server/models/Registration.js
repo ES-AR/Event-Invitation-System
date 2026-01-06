@@ -13,6 +13,7 @@ const registrationSchema = new mongoose.Schema(
     note: { type: String, default: "" },
     dietaryRestrictions: { type: String, default: "None" },
     ticketTier: { type: String, default: "Main" },
+    photoUrl: { type: String, required: true },
 
     slotType: {
       type: String,
@@ -22,15 +23,11 @@ const registrationSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "checked-in", "cancelled"],
+      enum: ["pending", "approved", "rejected", "cancelled"],
       default: "pending",
     },
 
     isApproved: { type: Boolean, default: false },
-    checkedIn: { type: Boolean, default: false },
-    checkInToken: { type: String, default: null },
-    checkInPhoto: { type: String, default: null },
-    checkInTime: { type: Date, default: null },
     statusHistory: {
       type: [
         new mongoose.Schema(

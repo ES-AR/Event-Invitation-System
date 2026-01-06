@@ -2,7 +2,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-const rootUploadsDir = path.join(process.cwd(), "server", "uploads", "checkins");
+const rootUploadsDir = path.join(process.cwd(), "server", "uploads", "attendees");
 fs.mkdirSync(rootUploadsDir, { recursive: true });
 
 const storage = multer.diskStorage({
@@ -23,7 +23,7 @@ const fileFilter = (req, file, cb) => {
 	cb(null, true);
 };
 
-export const checkInUpload = multer({
+export const attendeePhotoUpload = multer({
 	storage,
 	fileFilter,
 	limits: { fileSize: 5 * 1024 * 1024 },
