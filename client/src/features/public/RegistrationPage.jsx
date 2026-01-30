@@ -39,8 +39,9 @@ export default function RegistrationPage() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const tierParam = (searchParams.get("tier") || "").toLowerCase();
-  const activeTier = tierParam === "overflow" ? "overflow" : "main";
-  const isOverflowView = activeTier === "overflow";
+  const derivedTier = tierParam === "overflow" ? "overflow" : "main";
+  const [slotChoice, setSlotChoice] = useState(derivedTier);
+  const isOverflowView = slotChoice === "overflow";
   const [event, setEvent] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
@@ -49,6 +50,10 @@ export default function RegistrationPage() {
   const [error, setError] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+
+  useEffect(() => {
+    setSlotChoice(derivedTier);
+  }, [derivedTier]);
 
   useEffect(() => {
     let isMounted = true;
@@ -73,10 +78,10 @@ export default function RegistrationPage() {
 
   const tierPill = useMemo(() => {
     if (!event) return null;
-    const label = activeTier === "overflow" ? "Overflow Registration" : "Main Slot";
-    const tone = activeTier === "overflow" ? "warning" : "success";
+    const label = slotChoice === "overflow" ? "Overflow Waitlist" : "Main Slot";
+    const tone = slotChoice === "overflow" ? "warning" : "success";
     return <Badge tone={tone}>{label}</Badge>;
-  }, [event, activeTier]);
+  }, [event, slotChoice]);
 
   const handleChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -117,6 +122,26 @@ export default function RegistrationPage() {
     };
   }, [event]);
   const visibleTierData = isOverflowView ? quotaStats.overflow : quotaStats.main;
+  const mainRemaining = quotaStats.main?.remaining ?? 0;
+  const overflowRemaining = quotaStats.overflow?.remaining ?? 0;
+  const overflowConfigured = (event?.maxOverflowSlots ?? quotaStats.overflow?.capacity ?? 0) > 0;
+  const overflowHasRoom = overflowRemaining > 0;
+  const mainCapacityConfigured = (event?.maxMainSlots ?? quotaStats.main?.capacity ?? 0) > 0;
+  const mainFull = mainCapacityConfigured && mainRemaining <= 0;
+  const waitlistOfferActive = !isOverflowView && mainFull && overflowConfigured && overflowHasRoom;
+  const waitlistUnavailable = mainFull && (!overflowConfigured || !overflowHasRoom);
+  const overflowClosed = isOverflowView && (!overflowConfigured || !overflowHasRoom);
+  const submitDisabled =
+    submitting || (!isOverflowView && waitlistUnavailable) || overflowClosed;
+  const submitLabel = !isOverflowView && waitlistUnavailable
+    ? "Registration full"
+    : overflowClosed
+      ? "Waitlist full"
+      : submitting
+        ? "Submitting..."
+        : isOverflowView
+          ? "Join overflow waitlist"
+          : "Request my invite";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -125,12 +150,18 @@ export default function RegistrationPage() {
       return;
     }
 
-    const mainRemaining = quotaStats.main?.remaining ?? 0;
-    const overflowRemaining = quotaStats.overflow?.remaining ?? 0;
-    const overflowConfigured = (event.maxOverflowSlots ?? quotaStats.overflow?.capacity ?? 0) > 0;
+    if (!photoFile) {
+      setError("Please upload a photo to continue.");
+      return;
+    }
 
-    if (!isOverflowView && mainRemaining <= 0) {
-      setError("Main quota is full. Please request the overflow link from your host.");
+    if (!isOverflowView && waitlistUnavailable) {
+      setError("Registration is currently full. Please check back later.");
+      return;
+    }
+
+    if (!isOverflowView && waitlistOfferActive) {
+      setError("Main registration is full. Tap \"Join overflow waitlist\" to continue.");
       return;
     }
 
@@ -139,18 +170,18 @@ export default function RegistrationPage() {
         setError("Overflow quota is not available for this event.");
         return;
       }
-      if (mainRemaining > 0) {
+      if (!mainFull) {
         setError("Main quota still has space. Use the primary registration link.");
         return;
       }
-      if (overflowRemaining <= 0) {
+      if (!overflowHasRoom) {
         setError("Overflow quota is currently full.");
         return;
       }
     }
 
-    if (!photoFile) {
-      setError("Please upload a photo to continue.");
+    if (!isOverflowView && mainFull) {
+      setError("Main quota is currently full. Please join the overflow waitlist.");
       return;
     }
 
@@ -321,7 +352,58 @@ export default function RegistrationPage() {
           </Card>
         </section>
 
-        <section className="flex-1">
+        <section className="flex-1 space-y-6">
+          {waitlistOfferActive && (
+            <Card className="border border-amber-200 bg-amber-50 p-5 text-amber-900">
+              <p className="text-sm font-semibold text-amber-900">Main registration is full.</p>
+              <p className="mt-2 text-sm text-amber-800">
+                Would you like to join the overflow waitlist? We'll notify you as soon as seats open up.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setSlotChoice("overflow");
+                    setError(null);
+                  }}
+                  className="bg-amber-600 text-white hover:bg-amber-700"
+                >
+                  Join overflow waitlist
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {waitlistUnavailable && (
+            <Card className="border border-slate-200 bg-slate-50 p-5 text-slate-700">
+              <p className="text-sm font-semibold text-slate-900">Registration currently full</p>
+              <p className="mt-2 text-sm">
+                Both the main quota and overflow waitlist are at capacity. Please check back later or contact the host.
+              </p>
+            </Card>
+          )}
+
+          {isOverflowView && (
+            <Card className="border border-amber-200 bg-amber-50 p-5 text-amber-900">
+              <p className="text-sm font-semibold">You're joining the overflow waitlist</p>
+              <p className="mt-2 text-sm text-amber-800">
+                We'll email you if a seat opens up. In the meantime, your RSVP remains pending.
+              </p>
+              {!mainFull && (
+                <button
+                  type="button"
+                  className="mt-3 text-xs font-semibold uppercase tracking-[0.3em] text-amber-700"
+                  onClick={() => {
+                    setSlotChoice("main");
+                    setError(null);
+                  }}
+                >
+                  Return to main RSVP
+                </button>
+              )}
+            </Card>
+          )}
+
           <form
             onSubmit={handleSubmit}
             className="space-y-6 rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_25px_70px_-40px_rgba(15,23,42,0.6)]"
@@ -402,8 +484,8 @@ export default function RegistrationPage() {
               )}
             </div>
             {error && <p className="text-sm font-semibold text-danger">{error}</p>}
-            <Button type="submit" disabled={submitting} className="w-full justify-center">
-              {submitting ? "Submitting..." : isOverflowView ? "Join overflow list" : "Request my invite"}
+            <Button type="submit" disabled={submitDisabled} className="w-full justify-center">
+              {submitLabel}
             </Button>
           </form>
         </section>

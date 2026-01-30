@@ -1,6 +1,5 @@
 // Event.js
 import mongoose from "mongoose";
-
 const eventSchema = new mongoose.Schema(
   {
     organizer: {
@@ -42,6 +41,9 @@ const eventSchema = new mongoose.Schema(
     contactEmail: { type: String, default: "" },
     contactPhone: { type: String, default: "" },
     supportLink: { type: String, default: "" },
+    checkInTokenHash: { type: String, default: "" },
+    checkInTokenHint: { type: String, default: "" },
+    checkInTokenIssuedAt: { type: Date, default: null },
     theme: {
       primary: { type: String, default: "#2563eb" },
       secondary: { type: String, default: "#0f172a" },

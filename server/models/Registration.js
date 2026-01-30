@@ -14,6 +14,11 @@ const registrationSchema = new mongoose.Schema(
     dietaryRestrictions: { type: String, default: "None" },
     ticketTier: { type: String, default: "Main" },
     photoUrl: { type: String, required: true },
+    ticketCode: { type: String, trim: true, default: "" },
+
+    isCheckedIn: { type: Boolean, default: false },
+    checkedInAt: { type: Date, default: null },
+    checkedInBy: { type: String, default: "" },
 
     slotType: {
       type: String,
@@ -46,5 +51,7 @@ const registrationSchema = new mongoose.Schema(
 );
 
 registrationSchema.index({ email: 1, event: 1 }, { unique: true });
+registrationSchema.index({ event: 1, ticketCode: 1 });
+registrationSchema.index({ event: 1, isCheckedIn: 1 });
 
 export default mongoose.model("Registration", registrationSchema);

@@ -14,6 +14,7 @@ import eventRoutes from "./routes/event.routes.js";
 import registrationRoutes from "./routes/registration.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import geocodeRoutes from "./routes/geocode.routes.js";
+import checkInRoutes from "./routes/checkin.routes.js";
 import { seedDefaultAdmin } from "./utils/seedAdmin.js";
 
 const app = express();
@@ -40,6 +41,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/event", eventRoutes);
 app.use("/api/registration", registrationRoutes);
 app.use("/api/geocode", geocodeRoutes);
+app.use("/api/checkin", checkInRoutes);
 
 // Root
 app.get("/", (req, res) => {

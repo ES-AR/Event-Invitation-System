@@ -13,6 +13,7 @@ import {
   getEvent,
   openRegistration,
   updateEvent,
+  issueCheckInToken,
 } from "../../services/event.service";
 import LocationPicker from "./components/LocationPicker";
 
@@ -57,7 +58,12 @@ const defaultEvent = {
   checkInInstructions: "",
   contactEmail: "",
   timezone: localTimeZone,
+  checkInLink: "",
+  checkInTokenHint: "",
+  checkInTokenIssuedAt: "",
 };
+
+const inviteOrigin = typeof window !== "undefined" ? window.location.origin : "https://invite.local";
 
 const formatDateForInput = (value, timeZone = localTimeZone) => {
   if (!value) return "";
@@ -145,6 +151,9 @@ const hydrateForm = (event = defaultEvent) => {
     endTime: formatTimeForInput(event.endDate, timeZone),
     registrationClosesAt: formatDateForInput(event.registrationClosesAt, timeZone),
     registrationClosesTime: formatTimeForInput(event.registrationClosesAt, timeZone),
+    checkInLink: event.checkIn?.link || event.checkInLink || "",
+    checkInTokenHint: event.checkIn?.tokenHint || event.checkInTokenHint || "",
+    checkInTokenIssuedAt: event.checkIn?.tokenIssuedAt || event.checkInTokenIssuedAt || "",
   };
 };
 export default function EventBuilderPage() {
@@ -157,20 +166,27 @@ export default function EventBuilderPage() {
   const [message, setMessage] = useState("");
   const [copyState, setCopyState] = useState(null);
   const [loadingEvent, setLoadingEvent] = useState(false);
+  const [issuingToken, setIssuingToken] = useState(false);
+  const [freshToken, setFreshToken] = useState("");
   const copyTimer = useRef(null);
   const slugCheckTimer = useRef(null);
+  const freshTokenTimer = useRef(null);
   const [slugStatus, setSlugStatus] = useState({ state: "idle" });
   const eventIdParam = searchParams.get("eventId");
 
-  const inviteOrigin = typeof window !== "undefined" ? window.location.origin : "https://invite.local";
   const previewLinks = useMemo(() => {
     const slugSegment = form.publicSlug?.trim() || "your-slug";
     const baseLink = `${inviteOrigin}/invite/${slugSegment}`;
     return {
       main: baseLink,
       overflow: `${baseLink}?tier=overflow`,
+      checkIn: `${inviteOrigin}/checkin/${slugSegment}`,
     };
   }, [form.publicSlug, inviteOrigin]);
+  const resolvedCheckInLink = form.checkInLink?.trim() || previewLinks.checkIn;
+  const tokenIssuedLabel = form.checkInTokenIssuedAt
+    ? new Date(form.checkInTokenIssuedAt).toLocaleString()
+    : "Never issued";
   const slugHint = useMemo(() => {
     switch (slugStatus.state) {
       case "checking":
@@ -200,6 +216,7 @@ export default function EventBuilderPage() {
           setSelectedId(response.event.id);
           setMode("edit");
           setMessage("");
+          setFreshToken("");
         }
       } catch (err) {
         console.error("Unable to load event", err);
@@ -270,6 +287,9 @@ export default function EventBuilderPage() {
       if (copyTimer.current) {
         clearTimeout(copyTimer.current);
       }
+      if (freshTokenTimer.current) {
+        clearTimeout(freshTokenTimer.current);
+      }
     },
     []
   );
@@ -279,6 +299,7 @@ export default function EventBuilderPage() {
     setMode("create");
     setForm({ ...defaultEvent });
     setMessage("");
+    setFreshToken("");
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev);
       params.delete("eventId");
@@ -287,7 +308,13 @@ export default function EventBuilderPage() {
   };
 
   const handleChange = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === "publicSlug") {
+        next.checkInLink = "";
+      }
+      return next;
+    });
   };
 
   const buildPayload = () => {
@@ -297,6 +324,9 @@ export default function EventBuilderPage() {
       createdAt,
       updatedAt,
       quota,
+      checkInLink,
+      checkInTokenHint,
+      checkInTokenIssuedAt,
       startTime,
       endTime,
       registrationClosesTime,
@@ -404,6 +434,28 @@ export default function EventBuilderPage() {
       copyTimer.current = setTimeout(() => setCopyState(null), 2000);
     } catch (err) {
       console.error("Unable to copy invite link", err);
+    }
+  };
+
+  const handleIssueToken = async () => {
+    if (!token || !selectedId) return;
+    setIssuingToken(true);
+    try {
+      const response = await issueCheckInToken(selectedId, token);
+      if (response?.event) {
+        setForm(hydrateForm(response.event));
+      }
+      if (response?.token) {
+        setFreshToken(response.token);
+        if (freshTokenTimer.current) {
+          clearTimeout(freshTokenTimer.current);
+        }
+        freshTokenTimer.current = setTimeout(() => setFreshToken(""), 60000);
+      }
+    } catch (err) {
+      setMessage(err.message || "Unable to refresh the check-in token");
+    } finally {
+      setIssuingToken(false);
     }
   };
 
@@ -534,6 +586,61 @@ export default function EventBuilderPage() {
                       </Button>
                     </div>
                   ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
+                <ShieldCheck className="h-4 w-4 text-primary-600" strokeWidth={1.8} /> Check-in desk
+              </p>
+              <div className="mt-2 space-y-4 rounded-3xl border border-slate-100 bg-slate-50/80 p-4">
+                <div className="flex flex-col gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-400">Staff link</span>
+                  <span className="break-all font-mono text-xs text-slate-500">{resolvedCheckInLink}</span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="self-start"
+                    onClick={() => handleCopy(resolvedCheckInLink)}
+                  >
+                    <Copy className="mr-2 h-4 w-4" strokeWidth={1.8} />
+                    {copyState === resolvedCheckInLink ? "Copied" : "Copy link"}
+                  </Button>
+                </div>
+                <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-600">
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Active token hint</p>
+                  <p className="mt-1 font-semibold text-slate-900">
+                    {form.checkInTokenHint ? `Ends with ${form.checkInTokenHint}` : "Not issued yet"}
+                  </p>
+                  <p className="text-xs text-slate-400">Last rotated · {tokenIssuedLabel}</p>
+                  {freshToken && (
+                    <div className="mt-3 space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-emerald-500">New token</p>
+                      <p className="font-mono text-lg">{freshToken}</p>
+                      <p className="text-xs text-emerald-700">Visible for 60 seconds — share directly with gate staff.</p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="border-emerald-400 text-emerald-800"
+                        onClick={() => handleCopy(freshToken)}
+                      >
+                        <Copy className="mr-2 h-4 w-4" strokeWidth={1.8} />
+                        {copyState === freshToken ? "Copied" : "Copy token"}
+                      </Button>
+                    </div>
+                  )}
+                  <Button
+                    type="button"
+                    className="mt-3"
+                    variant="primary"
+                    disabled={!selectedId || issuingToken}
+                    onClick={handleIssueToken}
+                  >
+                    {issuingToken ? "Generating…" : form.checkInTokenHint ? "Rotate token" : "Generate token"}
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>

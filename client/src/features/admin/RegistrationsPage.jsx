@@ -4,11 +4,34 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Input from "../../components/ui/Input";
-import { CalendarRange, CheckCircle2, ListChecks, Search, Trash2, Users } from "lucide-react";
+import { CalendarRange, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Search, Trash2, Users } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { listEvents } from "../../services/event.service";
 import { approveAttendee, deleteAttendee, fetchAttendees } from "../../services/registration.service";
-import { formatNumber } from "../../utils/formatters";
+
+const PAGE_SIZE = 9;
+const apiBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api").replace(/\/$/, "");
+let apiOrigin = "http://localhost:5000";
+try {
+  apiOrigin = new URL(apiBase).origin;
+} catch (err) {
+  if (apiBase.endsWith("/api")) {
+    apiOrigin = apiBase.slice(0, -4);
+  }
+}
+
+const buildPhotoUrl = (path) => {
+  if (!path) return null;
+  if (/^https?:/i.test(path)) return path;
+  return `${apiOrigin}${path.startsWith("/") ? path : `/${path}`}`;
+};
+
+const initialsFromName = (name = "") => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+};
 
 const statusTone = {
   approved: "success",
@@ -24,9 +47,10 @@ export default function RegistrationsPage() {
   const [data, setData] = useState([]);
   const [meta, setMeta] = useState({ total: 0 });
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(new Set());
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [listError, setListError] = useState(null);
   const initialEventId = searchParams.get("eventId") || "";
   const [selectedEventId, setSelectedEventId] = useState(initialEventId);
 
@@ -35,13 +59,27 @@ export default function RegistrationsPage() {
   const load = async (overrides = {}) => {
     if (!token || !selectedEventId) return;
     setLoading(true);
-    const params = { ...query, ...overrides, eventId: selectedEventId };
+    setListError(null);
+    const nextPage = overrides.page ?? page;
+    const params = {
+      ...query,
+      ...overrides,
+      page: nextPage || 1,
+      limit: overrides.limit || PAGE_SIZE,
+      eventId: selectedEventId,
+    };
     try {
       const response = await fetchAttendees(params, token);
       setData(response.attendees);
       setMeta(response.meta);
+      if (response?.meta?.page) {
+        setPage(response.meta.page);
+      } else {
+        setPage(params.page);
+      }
     } catch (err) {
       console.error("Unable to load attendees", err);
+      setListError(err.message || "Unable to load attendees");
     } finally {
       setLoading(false);
     }
@@ -69,31 +107,18 @@ export default function RegistrationsPage() {
   }, [selectedEventId, setSearchParams, token]);
 
   useEffect(() => {
-    load();
+    load({ page: 1 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, selectedEventId]);
 
-  useEffect(() => {
-    setSelected(new Set());
-  }, [selectedEventId]);
-
-  const toggleSelection = (id) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   const approve = async (id) => {
     await approveAttendee(id, token);
-    load();
+    load({ page });
   };
 
   const remove = async (id) => {
     await deleteAttendee(id, token);
-    load();
+    load({ page });
   };
 
   const handleEventChange = (eventId) => {
@@ -182,61 +207,101 @@ export default function RegistrationsPage() {
                 <option value="cancelled">Cancelled</option>
               </select>
             </label>
-            <Button onClick={() => load()} className="self-end">
+            <Button
+              onClick={() => {
+                setPage(1);
+                load({ page: 1 });
+              }}
+              className="self-end"
+            >
               Apply
             </Button>
           </div>
-          <div className="mt-6 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500">
-                  <th className="py-3">
-                    <input
-                      type="checkbox"
-                      onChange={(e) => setSelected(e.target.checked ? new Set(data.map((d) => d._id)) : new Set())}
-                    />
-                  </th>
-                  <th className="py-3">Name</th>
-                  <th className="py-3">Email</th>
-                  <th className="py-3">Registered</th>
-                  <th className="py-3">Status</th>
-                  <th className="py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="py-10 text-center text-slate-500">
-                      {selectedEventId ? "Loading attendees..." : "Select an event to load attendees"}
-                    </td>
-                  </tr>
-                ) : (
-                  data.map((attendee) => (
-                    <tr key={attendee._id} className="border-t border-slate-100">
-                      <td className="py-4">
-                        <input type="checkbox" checked={selected.has(attendee._id)} onChange={() => toggleSelection(attendee._id)} />
-                      </td>
-                      <td className="py-4 font-semibold text-slate-800">{attendee.fullName}</td>
-                      <td className="py-4 text-slate-500">{attendee.email}</td>
-                      <td className="py-4 text-slate-500">{new Date(attendee.createdAt).toLocaleString()}</td>
-                      <td className="py-4">
-                        <Badge tone={statusTone[attendee.status] || "neutral"}>{attendee.status}</Badge>
-                      </td>
-                      <td className="py-4">
-                        <div className="flex gap-3">
-                          <button className="inline-flex items-center gap-1 text-primary-600" onClick={() => approve(attendee._id)}>
+          <div className="mt-6">
+            {loading ? (
+              <div className="flex min-h-[320px] items-center justify-center text-sm text-slate-500">
+                {selectedEventId ? "Loading attendees..." : "Select an event to load attendees"}
+              </div>
+            ) : listError ? (
+              <div className="rounded-3xl border border-danger/30 bg-danger/5 p-6 text-center text-danger">
+                {listError}
+              </div>
+            ) : data.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/60 p-10 text-center text-sm text-slate-500">
+                No attendees match your filters yet.
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {data.map((attendee) => {
+                    const photoSrc = buildPhotoUrl(attendee.photoUrl);
+                    const initials = initialsFromName(attendee.fullName);
+                    return (
+                      <div key={attendee._id} className="flex h-full flex-col gap-4 rounded-3xl border border-slate-100 bg-white/95 p-5 shadow-[0_25px_50px_-35px_rgba(15,23,42,0.35)]">
+                        <div className="flex items-center gap-4">
+                          <div className="relative h-16 w-16 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+                            {photoSrc ? (
+                              <img src={photoSrc} alt={attendee.fullName} className="h-full w-full object-cover" />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center text-lg font-semibold text-slate-500">
+                                {initials}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-base font-semibold text-slate-900">{attendee.fullName}</p>
+                            <p className="text-sm text-slate-500">{attendee.email}</p>
+                            <p className="text-xs text-slate-400">Registered {new Date(attendee.createdAt).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <Badge tone={statusTone[attendee.status] || "neutral"}>{attendee.status}</Badge>
+                          <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
+                            {(attendee.slotType || "main").toUpperCase()} • {attendee.ticketTier || "Main"}
+                          </span>
+                        </div>
+                        <p className="flex-1 text-sm text-slate-600">{attendee.organization || attendee.jobTitle || "No additional notes."}</p>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm"
+                            onClick={() => approve(attendee._id)}
+                          >
                             <CheckCircle2 className="h-4 w-4" strokeWidth={1.8} /> Approve
                           </button>
-                          <button className="inline-flex items-center gap-1 text-danger" onClick={() => remove(attendee._id)}>
+                          <button
+                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-danger/40 px-3 py-2 text-sm font-semibold text-danger"
+                            onClick={() => remove(attendee._id)}
+                          >
                             <Trash2 className="h-4 w-4" strokeWidth={1.8} /> Delete
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))
+                      </div>
+                    );
+                  })}
+                </div>
+                {(meta?.pages || 1) > 1 && (
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+                    <button
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-40"
+                      onClick={() => page > 1 && load({ page: page - 1 })}
+                      disabled={page <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" strokeWidth={1.8} /> Prev
+                    </button>
+                    <p className="text-sm text-slate-500">
+                      Page {page} of {meta.pages || 1} · Showing up to {PAGE_SIZE} attendees per view
+                    </p>
+                    <button
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-40"
+                      onClick={() => page < (meta.pages || 1) && load({ page: page + 1 })}
+                      disabled={page >= (meta.pages || 1)}
+                    >
+                      Next <ChevronRight className="h-4 w-4" strokeWidth={1.8} />
+                    </button>
+                  </div>
                 )}
-              </tbody>
-            </table>
+              </>
+            )}
           </div>
         </Card>
       )}

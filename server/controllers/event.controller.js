@@ -7,6 +7,7 @@ import {
   requireOrganizerEvent,
 } from "../utils/eventSetup.js";
 import { applyAutoClose } from "../utils/eventStatus.js";
+import { createCheckInToken } from "../utils/helpers.js";
 
 const editableFields = [
   "title",
@@ -40,7 +41,7 @@ const editableFields = [
 
 const FRONTEND_ORIGIN = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
 
-const serializeEvent = (event, { includeShareUrl = true, quota } = {}) => {
+const serializeEvent = (event, { includeShareUrl = true, includeCheckInMeta = true, quota } = {}) => {
   const serialized = {
     id: event._id?.toString?.(),
     title: event.title,
@@ -77,6 +78,15 @@ const serializeEvent = (event, { includeShareUrl = true, quota } = {}) => {
 
   if (includeShareUrl) {
     serialized.shareUrl = `${FRONTEND_ORIGIN}/invite/${event.publicSlug}`;
+  }
+
+  if (includeCheckInMeta) {
+    serialized.checkIn = {
+      link: `${FRONTEND_ORIGIN}/checkin/${event.publicSlug}`,
+      tokenHint: event.checkInTokenHint || "",
+      tokenIssuedAt: event.checkInTokenIssuedAt,
+      hasToken: Boolean(event.checkInTokenHash),
+    };
   }
 
   if (quota) {
@@ -224,6 +234,28 @@ export const openRegistration = async (req, res) => {
   }
 };
 
+export const issueCheckInToken = async (req, res) => {
+  try {
+    const event = await requireOrganizerEvent(req.admin._id, req.params.eventId);
+    const { token, hash, hint } = createCheckInToken();
+
+    event.checkInTokenHash = hash;
+    event.checkInTokenHint = hint;
+    event.checkInTokenIssuedAt = new Date();
+    await event.save();
+
+    res.json({
+      message: "Check-in token updated",
+      token,
+      event: serializeEvent(event),
+    });
+  } catch (error) {
+    const status = error.statusCode || 500;
+    console.error("Error issuing check-in token", error);
+    res.status(status).json({ message: error.message || "Unable to issue check-in token" });
+  }
+};
+
 export const getEventStats = async (req, res) => {
   try {
     const event = await applyAutoClose(await requireOrganizerEvent(req.admin._id, req.params.eventId));
@@ -299,7 +331,7 @@ export const getPublicEvent = async (req, res) => {
     };
 
     res.json({
-      event: serializeEvent(event, { includeShareUrl: false, quota }),
+      event: serializeEvent(event, { includeShareUrl: false, includeCheckInMeta: false, quota }),
     });
   } catch (error) {
     console.error("Error fetching public event:", error);

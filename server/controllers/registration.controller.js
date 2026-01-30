@@ -6,6 +6,7 @@ import Event from "../models/Event.js";
 import { normalizeSlug, requireOrganizerEvent } from "../utils/eventSetup.js";
 import { applyAutoClose } from "../utils/eventStatus.js";
 import { sendEventApprovalEmail } from "../services/email.service.js";
+import { buildTicketCode } from "../utils/helpers.js";
 
 const slotCountsForEvent = async (eventId) => {
   const activeFilter = { $nin: ["cancelled", "rejected"] };
@@ -34,6 +35,22 @@ const pushStatusHistory = (attendee, status, note = "") => {
     attendee.statusHistory = [];
   }
   attendee.statusHistory.push({ status, note, changedAt: new Date() });
+};
+
+const generateUniqueTicketCode = async (event) => {
+  const fallback = `#${event.publicSlug?.slice(0, 3)?.toUpperCase() || "EVT"}-${Date.now()
+    .toString()
+    .slice(-3)}`;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const candidate = buildTicketCode(event.publicSlug || event._id.toString());
+    const exists = await Registration.exists({ event: event._id, ticketCode: candidate });
+    if (!exists) {
+      return candidate;
+    }
+  }
+
+  return fallback;
 };
 
 export const registerUser = async (req, res) => {
@@ -112,33 +129,51 @@ export const registerUser = async (req, res) => {
     const [mainCount, overflowCount] = await slotCountsForEvent(event._id);
     const tierPreference = (ticketTier || "Main").toString().trim().toLowerCase();
     const wantsOverflow = tierPreference === "overflow";
-    const overflowCapacity = event.maxOverflowSlots || 0;
+    const mainCapacity = Math.max(event.maxMainSlots || 0, 0);
+    const overflowCapacity = Math.max(event.maxOverflowSlots || 0, 0);
+    const mainFull = mainCapacity > 0 && mainCount >= mainCapacity;
+    const overflowEnabled = overflowCapacity > 0;
+    const overflowFull = overflowEnabled && overflowCount >= overflowCapacity;
+
     let slotType = wantsOverflow ? "overflow" : "main";
+    let overflowAutoAssigned = false;
 
     if (wantsOverflow) {
-      if (!overflowCapacity) {
+      if (!overflowEnabled) {
         return abort(400, { message: "Overflow registration is not enabled for this event." });
       }
-      if (mainCount < event.maxMainSlots) {
+      if (!mainFull) {
         return abort(400, {
           message: "Main quota still has space. Use the primary registration link.",
           code: "MAIN_AVAILABLE",
         });
       }
-      if (overflowCount >= overflowCapacity) {
+      if (overflowFull) {
         return abort(400, { message: "Overflow slots are currently full" });
       }
       slotType = "overflow";
-    } else if (mainCount >= event.maxMainSlots) {
-      return abort(400, {
-        message: "Main quota is full. Request the overflow link from your host.",
-        code: "MAIN_FULL",
-      });
+    } else if (mainFull) {
+      if (!overflowEnabled) {
+        return abort(400, {
+          message: "Main quota is full and overflow waitlist is unavailable.",
+          code: "MAIN_FULL",
+        });
+      }
+      if (overflowFull) {
+        return abort(400, {
+          message: "Main quota is full and overflow waitlist is currently closed.",
+          code: "WAITLIST_FULL",
+        });
+      }
+      slotType = "overflow";
+      overflowAutoAssigned = true;
     }
 
-    const status = event.requiresApproval ? "pending" : "approved";
+    const status = slotType === "overflow" ? "pending" : event.requiresApproval ? "pending" : "approved";
     const isApproved = status === "approved";
+    const resolvedTicketTier = slotType === "overflow" ? "Overflow" : ticketTier;
     const photoUrl = `/uploads/attendees/${req.file.filename}`;
+    const ticketCode = await generateUniqueTicketCode(event);
 
     const registration = await Registration.create({
       event: event._id,
@@ -151,11 +186,12 @@ export const registerUser = async (req, res) => {
       jobTitle,
       note,
       dietaryRestrictions,
-      ticketTier,
+      ticketTier: resolvedTicketTier,
       slotType,
       status,
       isApproved,
       photoUrl,
+      ticketCode,
       statusHistory: [
         {
           status,
@@ -173,10 +209,16 @@ export const registerUser = async (req, res) => {
       }
     }
 
+    const overflowMessage = overflowAutoAssigned
+      ? "Main registration is full. You're now on the overflow waitlist — we'll email you if a seat opens."
+      : "Overflow waitlist joined. We'll reach out if a seat opens.";
+
     const message =
-      status === "approved"
-        ? "Registration confirmed — event details are on the way to your inbox."
-        : "Registration received. Await approval email.";
+      slotType === "overflow"
+        ? overflowMessage
+        : status === "approved"
+          ? "Registration confirmed — event details are on the way to your inbox."
+          : "Registration received. Await approval email.";
 
     res.status(201).json({ message, registration });
   } catch (err) {
@@ -207,6 +249,8 @@ export const listAttendees = async (req, res) => {
         { fullName: { $regex: searchTerm, $options: "i" } },
         { email: { $regex: searchTerm, $options: "i" } },
         { organization: { $regex: searchTerm, $options: "i" } },
+          { phone: { $regex: searchTerm, $options: "i" } },
+          { ticketCode: { $regex: searchTerm.replace(/^#/, ""), $options: "i" } },
       ];
     }
 

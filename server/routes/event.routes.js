@@ -11,6 +11,7 @@ import {
   getEventStats,
   getPublicEvent,
   checkSlugAvailability,
+  issueCheckInToken,
 } from "../controllers/event.controller.js";
 import requireAdmin from "../middleware/requireAdmin.js";
 
@@ -28,5 +29,6 @@ router.delete("/:eventId", requireAdmin, deleteEvent);
 router.post("/:eventId/close", requireAdmin, closeRegistration);
 router.post("/:eventId/open", requireAdmin, openRegistration);
 router.get("/:eventId/stats", requireAdmin, getEventStats);
+router.post("/:eventId/checkin/token", requireAdmin, issueCheckInToken);
 
 export default router;

@@ -60,3 +60,10 @@ export function closeRegistration(eventId, token, reason) {
     data: { reason },
   });
 }
+
+export function issueCheckInToken(eventId, token) {
+  return apiClient(`/event/${eventId}/checkin/token`, {
+    method: "POST",
+    token,
+  });
+}

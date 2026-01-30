@@ -10,6 +10,7 @@ import DashboardPage from "./features/admin/DashboardPage";
 import RegistrationsPage from "./features/admin/RegistrationsPage";
 import EventsManagerPage from "./features/admin/EventsManagerPage";
 import EventBuilderPage from "./features/admin/EventBuilderPage";
+import CheckInPage from "./features/checkin/CheckInPage";
 
 export default function App() {
   return (
@@ -23,6 +24,8 @@ export default function App() {
 
           <Route path="/admin/login" element={<OrganizerLogin />} />
           <Route path="/admin/register" element={<OrganizerRegister />} />
+
+          <Route path="/checkin/:slug" element={<CheckInPage />} />
 
           <Route
             path="/admin"
