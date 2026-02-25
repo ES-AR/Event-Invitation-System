@@ -6,8 +6,8 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
-import { MongoMemoryServer } from "mongodb-memory-server";
 
 // Route imports
 import eventRoutes from "./routes/event.routes.js";
@@ -34,7 +34,13 @@ app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" })); // allow photo uploads
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+const uploadsDir = path.join(__dirname, "uploads");
+app.use("/uploads", express.static(uploadsDir));
+
+const legacyUploadsDir = path.join(__dirname, "server", "uploads");
+if (fs.existsSync(legacyUploadsDir)) {
+  app.use("/uploads", express.static(legacyUploadsDir));
+}
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -49,27 +55,14 @@ app.get("/", (req, res) => {
 });
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/event_invitation";
-let memoryServer;
 
 async function connectDatabase() {
   try {
     await mongoose.connect(MONGO_URI);
     console.log("MongoDB connected");
   } catch (err) {
-    if (process.env.NODE_ENV === "production") {
-      console.error("Database connection failed:", err.message);
-      process.exit(1);
-    }
-
-    console.warn(
-      "Mongo connection failed (", err.message,
-      "). Falling back to in-memory MongoDB for development."
-    );
-
-    memoryServer = await MongoMemoryServer.create();
-    const memoryUri = memoryServer.getUri();
-    await mongoose.connect(memoryUri);
-    console.log("MongoDB connected (in-memory)");
+    console.error("Database connection failed:", err.message);
+    process.exit(1);
   }
 }
 
@@ -84,9 +77,6 @@ async function start() {
 
   const shutdown = async () => {
     await mongoose.disconnect();
-    if (memoryServer) {
-      await memoryServer.stop();
-    }
     server.close(() => process.exit(0));
   };
 

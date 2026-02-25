@@ -343,7 +343,7 @@ export default function CheckInPage() {
           </div>
         </header>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[280px,minmax(0,1fr),300px] xl:grid-cols-[320px,minmax(0,1fr),320px]">
+        <div className="mt-8 flex flex-col gap-6 lg:flex-row">
           <aside className="flex min-h-[560px] flex-col rounded-[32px] border border-white/10 bg-white/[0.03] p-6 shadow-2xl shadow-black/40">
             <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
               <div className="flex items-center gap-3 text-sm text-slate-300">
@@ -495,39 +495,8 @@ export default function CheckInPage() {
                 </div>
               ))}
             </div>
-          </main>
 
-          <section className="space-y-6">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm shadow-2xl shadow-black/30">
-              <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Check-in details</p>
-              <div className="mt-4 space-y-3 text-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Organization</span>
-                  <span>{activeAttendee?.organization || "TechFlow Inc."}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Guest quota</span>
-                  <span>{activeAttendee ? (activeAttendee.isCheckedIn ? "1 / 1 used" : "0 / 1 used") : "—"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Registration</span>
-                  <span>
-                    {activeAttendee?.createdAt
-                      ? new Date(activeAttendee.createdAt).toLocaleDateString()
-                      : "—"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 p-6 text-sm text-amber-100">
-              <p className="text-xs uppercase tracking-[0.4em]">Special instructions</p>
-              <p className="mt-3 text-amber-50">
-                {activeAttendee?.note || session?.event?.checkInInstructions || "Verify photo before admitting."}
-              </p>
-            </div>
-
-            <div className="rounded-3xl border border-white/10 bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-sm shadow-2xl shadow-indigo-900/40">
+            <div className="mt-8 rounded-3xl border border-white/10 bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-sm shadow-2xl shadow-indigo-900/40">
               <p className="text-xs uppercase tracking-[0.4em] text-white/70">Action center</p>
               <div className="mt-4 flex flex-col gap-3">
                 <button
@@ -565,8 +534,39 @@ export default function CheckInPage() {
                 )}
               </div>
             </div>
-          </section>
+          </main>
         </div>
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm shadow-2xl shadow-black/30">
+            <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Check-in details</p>
+            <div className="mt-4 space-y-3 text-slate-200">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Organization</span>
+                <span>{activeAttendee?.organization || "TechFlow Inc."}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Guest quota</span>
+                <span>{activeAttendee ? (activeAttendee.isCheckedIn ? "1 / 1 used" : "0 / 1 used") : "—"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Registration</span>
+                <span>
+                  {activeAttendee?.createdAt
+                    ? new Date(activeAttendee.createdAt).toLocaleDateString()
+                    : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 p-6 text-sm text-amber-100">
+            <p className="text-xs uppercase tracking-[0.4em]">Special instructions</p>
+            <p className="mt-3 text-amber-50">
+              {activeAttendee?.note || session?.event?.checkInInstructions || "Verify photo before admitting."}
+            </p>
+          </div>
+        </section>
       </div>
 
       {!session && (

@@ -263,8 +263,9 @@ export default function RegistrationsPage() {
                         <p className="flex-1 text-sm text-slate-600">{attendee.organization || attendee.jobTitle || "No additional notes."}</p>
                         <div className="flex flex-wrap gap-3">
                           <button
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm"
+                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={() => approve(attendee._id)}
+                            disabled={attendee.status === "approved"}
                           >
                             <CheckCircle2 className="h-4 w-4" strokeWidth={1.8} /> Approve
                           </button>

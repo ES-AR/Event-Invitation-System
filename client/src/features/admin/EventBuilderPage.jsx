@@ -475,9 +475,11 @@ export default function EventBuilderPage() {
           <Button type="button" variant="subtle" onClick={startCreateFlow}>
             New event
           </Button>
-          <Button type="submit" form="event-form" disabled={saving}>
-            {saving ? "Saving..." : mode === "create" ? "Create event" : "Save changes"}
-          </Button>
+          {selectedId && (
+            <Button type="button" variant="danger" onClick={handleDelete}>
+              Delete event
+            </Button>
+          )}
         </div>
       </div>
       {message && <p className="text-sm text-primary-600">{message}</p>}
@@ -719,14 +721,11 @@ export default function EventBuilderPage() {
             </label>
           </Card>
 
-          {selectedId && (
-            <div className="flex items-center justify-between rounded-2xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
-              <span>Need to retire this event?</span>
-              <button type="button" onClick={handleDelete} className="font-semibold">
-                Delete event
-              </button>
-            </div>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving..." : mode === "create" ? "Create event" : "Save changes"}
+            </Button>
+          </div>
         </form>
       )}
     </div>

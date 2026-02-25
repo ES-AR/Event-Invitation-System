@@ -68,6 +68,5 @@ const eventSchema = new mongoose.Schema(
 );
 
 eventSchema.index({ organizer: 1, createdAt: -1 });
-eventSchema.index({ publicSlug: 1 }, { unique: true });
 
 export default mongoose.model("Event", eventSchema);
