@@ -54,7 +54,7 @@ export default function OrganizerLogin() {
         </div>
       </section>
       <section className="flex items-center bg-white px-8 py-12">
-        <form onSubmit={handleSubmit} className="w-full max-w-md space-y-6">
+        <form onSubmit={handleSubmit} className="w-full max-w-md space-y-6 mx-auto">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Secure Portal</p>
             <h2 className="mt-2 font-display text-3xl text-slate-900">Welcome back</h2>

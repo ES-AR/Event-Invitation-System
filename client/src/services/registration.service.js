@@ -23,6 +23,13 @@ export function approveAttendee(id, token) {
   });
 }
 
+export function rejectAttendee(id, token) {
+  return apiClient(`/registration/reject/${id}`, {
+    method: "PUT",
+    token,
+  });
+}
+
 export function deleteAttendee(id, token) {
   return apiClient(`/registration/${id}`, {
     method: "DELETE",
@@ -38,11 +45,27 @@ export function bulkApprove(body, token) {
   });
 }
 
+export function bulkReject(body, token) {
+  return apiClient("/registration/bulk/reject", {
+    method: "POST",
+    data: body,
+    token,
+  });
+}
+
 export function bulkDelete(body, token) {
   return apiClient("/registration/bulk/delete", {
     method: "POST",
     data: body,
     token,
+  });
+}
+
+export function exportAttendeesCsv(params = {}, token) {
+  return apiClient("/registration/export/csv", {
+    query: params,
+    token,
+    headers: { Accept: "text/csv" },
   });
 }
 

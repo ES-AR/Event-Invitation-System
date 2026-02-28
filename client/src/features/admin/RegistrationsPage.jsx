@@ -4,10 +4,19 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Input from "../../components/ui/Input";
-import { CalendarRange, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Search, Trash2, Users } from "lucide-react";
+import { CalendarRange, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Search, Trash2, Users, XCircle } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { listEvents } from "../../services/event.service";
-import { approveAttendee, deleteAttendee, fetchAttendees } from "../../services/registration.service";
+import {
+  approveAttendee,
+  bulkApprove,
+  bulkReject,
+  bulkDelete,
+  deleteAttendee,
+  exportAttendeesCsv,
+  rejectAttendee,
+  fetchAttendees,
+} from "../../services/registration.service";
 
 const PAGE_SIZE = 9;
 const apiBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api").replace(/\/$/, "");
@@ -53,6 +62,7 @@ export default function RegistrationsPage() {
   const [listError, setListError] = useState(null);
   const initialEventId = searchParams.get("eventId") || "";
   const [selectedEventId, setSelectedEventId] = useState(initialEventId);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const selectedEvent = useMemo(() => events.find((event) => event.id === selectedEventId), [events, selectedEventId]);
 
@@ -111,6 +121,10 @@ export default function RegistrationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, selectedEventId]);
 
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => data.some((attendee) => attendee._id === id)));
+  }, [data]);
+
   const approve = async (id) => {
     await approveAttendee(id, token);
     load({ page });
@@ -118,6 +132,64 @@ export default function RegistrationsPage() {
 
   const remove = async (id) => {
     await deleteAttendee(id, token);
+    load({ page });
+  };
+
+  const reject = async (id) => {
+    await rejectAttendee(id, token);
+    load({ page });
+  };
+
+  const handleExportCsv = async () => {
+    if (!token || !selectedEventId) return;
+    const csv = await exportAttendeesCsv({ eventId: selectedEventId, status: "approved" }, token);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "approved-attendees.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const toggleSelection = (id) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const allSelected = data.length > 0 && data.every((attendee) => selectedIds.includes(attendee._id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds([]);
+      return;
+    }
+    setSelectedIds(data.map((attendee) => attendee._id));
+  };
+
+  const approveSelected = async () => {
+    if (!token || !selectedEventId || selectedIds.length === 0) return;
+    await bulkApprove({ ids: selectedIds, eventId: selectedEventId }, token);
+    setSelectedIds([]);
+    load({ page });
+  };
+
+  const rejectSelected = async () => {
+    if (!token || !selectedEventId || selectedIds.length === 0) return;
+    const confirmed = window.confirm("Reject the selected attendees?");
+    if (!confirmed) return;
+    await bulkReject({ ids: selectedIds, eventId: selectedEventId }, token);
+    setSelectedIds([]);
+    load({ page });
+  };
+
+  const deleteSelected = async () => {
+    if (!token || !selectedEventId || selectedIds.length === 0) return;
+    const confirmed = window.confirm("Delete the selected attendees?");
+    if (!confirmed) return;
+    await bulkDelete({ ids: selectedIds, eventId: selectedEventId }, token);
+    setSelectedIds([]);
     load({ page });
   };
 
@@ -148,10 +220,9 @@ export default function RegistrationsPage() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="secondary" disabled>
+          <Button variant="secondary" onClick={handleExportCsv} disabled={!selectedEventId || loading}>
             Export CSV
           </Button>
-          <Button disabled>Add registrant</Button>
         </div>
       </div>
 
@@ -232,12 +303,49 @@ export default function RegistrationsPage() {
               </div>
             ) : (
               <>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-slate-300 text-primary-600"
+                    />
+                    Select all on this page
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" size="sm" onClick={approveSelected} disabled={selectedIds.length === 0}>
+                      Approve selected
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={rejectSelected} disabled={selectedIds.length === 0}>
+                      Reject selected
+                    </Button>
+                    <Button variant="danger" size="sm" onClick={deleteSelected} disabled={selectedIds.length === 0}>
+                      Delete selected
+                    </Button>
+                  </div>
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {data.map((attendee) => {
                     const photoSrc = buildPhotoUrl(attendee.photoUrl);
                     const initials = initialsFromName(attendee.fullName);
+                    const isSelected = selectedIds.includes(attendee._id);
                     return (
-                      <div key={attendee._id} className="flex h-full flex-col gap-4 rounded-3xl border border-slate-100 bg-white/95 p-5 shadow-[0_25px_50px_-35px_rgba(15,23,42,0.35)]">
+                      <div
+                        key={attendee._id}
+                        className={`flex h-full flex-col gap-4 rounded-3xl border bg-white/95 p-5 shadow-[0_25px_50px_-35px_rgba(15,23,42,0.35)] ${
+                          isSelected ? "border-primary-200 ring-2 ring-primary-100" : "border-slate-100"
+                        }`}
+                      >
+                        
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelection(attendee._id)}
+                              className="h-4 w-4 rounded border-slate-300 text-primary-600"
+                            />
+                          </label>                        
                         <div className="flex items-center gap-4">
                           <div className="relative h-16 w-16 overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
                             {photoSrc ? (
@@ -257,10 +365,10 @@ export default function RegistrationsPage() {
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <Badge tone={statusTone[attendee.status] || "neutral"}>{attendee.status}</Badge>
                           <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
-                            {(attendee.slotType || "main").toUpperCase()} • {attendee.ticketTier || "Main"}
+                            Slot Type: {(attendee.slotType || "main").toUpperCase()} • Ticket Tier: {attendee.ticketTier || "Main"}
                           </span>
                         </div>
-                        <p className="flex-1 text-sm text-slate-600">{attendee.organization || attendee.jobTitle || "No additional notes."}</p>
+                        <p className="flex-1 text-sm text-slate-600">{attendee.organization || attendee.jobTitle || " "}</p> {/*for additional note for feature dev*/}
                         <div className="flex flex-wrap gap-3">
                           <button
                             className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
@@ -269,12 +377,21 @@ export default function RegistrationsPage() {
                           >
                             <CheckCircle2 className="h-4 w-4" strokeWidth={1.8} /> Approve
                           </button>
-                          <button
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-danger/40 px-3 py-2 text-sm font-semibold text-danger"
-                            onClick={() => remove(attendee._id)}
-                          >
-                            <Trash2 className="h-4 w-4" strokeWidth={1.8} /> Delete
-                          </button>
+                          {attendee.status === "rejected" ? (
+                            <button
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-danger/40 px-3 py-2 text-sm font-semibold text-danger"
+                              onClick={() => remove(attendee._id)}
+                            >
+                              <Trash2 className="h-4 w-4" strokeWidth={1.8} /> Delete
+                            </button>
+                          ) : (
+                            <button
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-amber-300/60 px-3 py-2 text-sm font-semibold text-amber-700"
+                              onClick={() => reject(attendee._id)}
+                            >
+                              <XCircle className="h-4 w-4" strokeWidth={1.8} /> Reject
+                            </button>
+                          )}
                         </div>
                       </div>
                     );

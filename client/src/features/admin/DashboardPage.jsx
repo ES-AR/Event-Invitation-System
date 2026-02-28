@@ -105,7 +105,7 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm text-slate-500">Overview · {admin?.displayName}</p>
-          <h1 className="font-display text-3xl text-slate-900">Craft unforgettable guest flows.</h1>
+          <h1 className="font-display text-3xl text-slate-900">Create Events and start inviting guests in minutes</h1>
         </div>
         <Button as={Link} to="/admin/events/builder" className="px-6">
           Create event
@@ -195,14 +195,14 @@ export default function DashboardPage() {
             })}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="grid gap-6 lg:grid-cols-[1fr]">
             <Card className="space-y-6">
               {statsLoading ? (
                 <div className="flex min-h-[180px] items-center justify-center">
                   <div className="spinner-ring-sm" />
                 </div>
               ) : (
-                <>
+                <> {/*check later for correction*/}
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Quota health</p>
@@ -225,47 +225,6 @@ export default function DashboardPage() {
                   </div>
                 </>
               )}
-            </Card>
-            <Card className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Event roster</p>
-                  <h2 className="font-display text-xl text-slate-900">All links</h2>
-                </div>
-                <Button as={Link} to="/admin/events" size="sm" variant="secondary">
-                  Manage events
-                </Button>
-              </div>
-              <div className="space-y-4">
-                {events.map((event) => (
-                  <div key={event.id} className="rounded-2xl border border-slate-100 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">{event.title}</p>
-                        <p className="text-xs text-slate-500">
-                          {formatDateRange(event.startDate, event.endDate, event.timezone || "UTC") || "Schedule pending"}
-                        </p>
-                      </div>
-                      <Badge tone={event.isRegistrationOpen ? "success" : "warning"}>
-                        {event.isRegistrationOpen ? "Live" : "Closed"}
-                      </Badge>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleCopyLink(event.shareUrl, event.id)}
-                      >
-                        <Copy className="mr-2 h-4 w-4" strokeWidth={1.8} />
-                        {copiedEventId === event.id ? "Copied" : "Copy link"}
-                      </Button>
-                      <Button size="sm" as={Link} to={`/admin/attendees?eventId=${event.id}`}>
-                        View attendees
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </Card>
           </div>
         </>

@@ -5,6 +5,7 @@ const variants = {
   secondary: "bg-white text-slate-700 border border-slate-200 hover:border-slate-400",
   subtle: "bg-slate-100 text-slate-700 hover:bg-slate-200",
   ghost: "text-slate-600 hover:text-slate-900",
+  danger: "bg-danger text-white shadow-soft hover:bg-danger/90",
 };
 
 const sizes = {

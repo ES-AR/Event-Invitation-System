@@ -238,3 +238,38 @@ export async function sendEventApprovalEmail(attendee, event) {
     return { sent: false, reason: error.message };
   }
 }
+
+export async function sendEventRejectionEmail(attendee, event) {
+  if (!transporter) {
+    console.warn("Gmail SMTP is not configured. Skipping email for", attendee.email);
+    return { sent: false, reason: "Gmail SMTP not configured" };
+  }
+
+  try {
+    const eventLink = buildEventLink(event);
+    const contactLine = event?.contactEmail || event?.contactPhone
+      ? `${event?.contactEmail || ""}${event?.contactEmail && event?.contactPhone ? " • " : ""}${event?.contactPhone || ""}`
+      : "";
+
+    await transporter.sendMail({
+      from: EMAIL_FROM || `${event?.title || "Event"} <${GMAIL_USER}>`,
+      to: attendee.email,
+      subject: `Update on your RSVP for ${event?.title || "the event"}`,
+      html: `
+        <p>Hi ${attendee.fullName},</p>
+        <p>Thanks for registering. Unfortunately, we are unable to approve your RSVP for this event.</p>
+        <hr style="margin:16px 0;border:none;border-top:1px solid #e2e8f0" />
+        <p><strong>Event:</strong> ${event?.title || "Private Event"}</p>
+        <p><strong>Invite link:</strong> <a href="${eventLink}">${eventLink}</a></p>
+        ${contactLine ? `<p><strong>Host contact:</strong> ${contactLine}</p>` : ""}
+        <hr style="margin:16px 0;border:none;border-top:1px solid #e2e8f0" />
+        <p>We appreciate your interest and hope to see you at a future event.</p>
+      `,
+    });
+
+    return { sent: true };
+  } catch (error) {
+    console.error("Failed to send rejection email:", error.message);
+    return { sent: false, reason: error.message };
+  }
+}

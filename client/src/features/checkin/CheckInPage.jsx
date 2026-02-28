@@ -313,13 +313,13 @@ export default function CheckInPage() {
       </div>
       <div className="relative z-10 mx-auto max-w-6xl px-4 py-10">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
-          <Link to="/admin" className="inline-flex items-center gap-2 text-sm text-slate-300 transition hover:text-white">
+          {/* <Link to="/admin" className="inline-flex items-center gap-2 text-sm text-slate-300 transition hover:text-white">
             <ArrowLeft className="h-4 w-4" strokeWidth={1.8} /> Back to Admin
-          </Link>
+          </Link> */}
           <div className="text-center">
-            <p className="text-xs uppercase tracking-[0.55em] text-primary-200">Gate Check-In Console</p>
+            <p className="text-xs uppercase tracking-[0.55em] text-primary-200">Gate Check-In</p>
             <h1 className="mt-2 font-display text-3xl text-white">{session?.event?.title || "Secure Entry"}</h1>
-            <p className="text-xs text-slate-400">Manual verification · link {slug}</p>
+            {/* <p className="text-xs text-slate-400">Manual verification · link {slug}</p> */}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/50 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
@@ -411,7 +411,7 @@ export default function CheckInPage() {
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-black/30 p-6 text-center text-sm text-slate-400">
                     <ShieldCheck className="mb-3 h-10 w-10 text-slate-500" strokeWidth={1.4} />
-                    Unlock the console with your access code.
+                    Unlock the Page with your access code.
                   </div>
                 )}
               </div>
@@ -497,7 +497,7 @@ export default function CheckInPage() {
             </div>
 
             <div className="mt-8 rounded-3xl border border-white/10 bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-sm shadow-2xl shadow-indigo-900/40">
-              <p className="text-xs uppercase tracking-[0.4em] text-white/70">Action center</p>
+              {/* <p className="text-xs uppercase tracking-[0.4em] text-white/70">Action center</p> */}
               <div className="mt-4 flex flex-col gap-3">
                 <button
                   type="button"
@@ -543,7 +543,7 @@ export default function CheckInPage() {
             <div className="mt-4 space-y-3 text-slate-200">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Organization</span>
-                <span>{activeAttendee?.organization || "TechFlow Inc."}</span>
+                <span>{activeAttendee?.organization || "QEIAS"}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Guest quota</span>
@@ -574,7 +574,7 @@ export default function CheckInPage() {
           <div className="w-full max-w-md rounded-[32px] border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 p-8 text-center text-slate-200 shadow-[0_40px_120px_rgba(2,6,23,0.9)]">
             <ShieldCheck className="mx-auto h-12 w-12 text-primary-300" strokeWidth={1.4} />
             <h2 className="mt-4 font-display text-2xl text-white">Enter Access Code</h2>
-            <p className="mt-2 text-sm text-slate-400">Only authorized gate staff can unlock this console.</p>
+            <p className="mt-2 text-sm text-slate-400">Only authorized gate staff can unlock this Page.</p>
             <form onSubmit={handleTokenSubmit} className="mt-6 space-y-4 text-left">
               <Input
                 label="Access token"
@@ -590,7 +590,7 @@ export default function CheckInPage() {
                 className="inline-flex w-full items-center justify-center rounded-2xl bg-primary-500/90 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-primary-900/40 transition hover:bg-primary-400"
                 disabled={authLoading}
               >
-                {authLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Unlock console"}
+                {authLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Unlock Page"}
               </button>
             </form>
           </div>

@@ -5,7 +5,7 @@ import Registration from "../models/Registration.js";
 import Event from "../models/Event.js";
 import { normalizeSlug, requireOrganizerEvent } from "../utils/eventSetup.js";
 import { applyAutoClose } from "../utils/eventStatus.js";
-import { sendEventApprovalEmail } from "../services/email.service.js";
+import { sendEventApprovalEmail, sendEventRejectionEmail } from "../services/email.service.js";
 import { buildTicketCode } from "../utils/helpers.js";
 
 const slotCountsForEvent = async (eventId) => {
@@ -328,6 +328,38 @@ export const approveAttendee = async (req, res) => {
   }
 };
 
+export const rejectAttendee = async (req, res) => {
+  try {
+    const attendee = await Registration.findById(req.params.id).populate("event");
+
+    if (!attendee || !attendee.event || String(attendee.event.organizer) !== String(req.admin._id)) {
+      return res.status(404).json({ message: "Attendee not found" });
+    }
+
+    if (attendee.status === "rejected") {
+      return res.json({ message: "Attendee already rejected", attendee, emailSent: false });
+    }
+
+    attendee.status = "rejected";
+    attendee.isApproved = false;
+    pushStatusHistory(attendee, "rejected", "Rejected manually");
+    await attendee.save();
+
+    const emailResult = attendee.event
+      ? await sendEventRejectionEmail(attendee, attendee.event)
+      : { sent: false, reason: "Event missing" };
+
+    res.json({
+      message: "Attendee rejected",
+      attendee,
+      emailSent: emailResult.sent,
+      emailError: emailResult.sent ? null : emailResult.reason,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 export const deleteAttendee = async (req, res) => {
   try {
     const attendee = await Registration.findById(req.params.id).populate("event", "organizer");
@@ -406,6 +438,51 @@ export const bulkDeleteAttendees = async (req, res) => {
     res.json({
       message: `Removed ${result.deletedCount} attendee(s)`,
       deleted: result.deletedCount,
+    });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    res.status(status).json({ message: err.message });
+  }
+};
+
+export const bulkRejectAttendees = async (req, res) => {
+  try {
+    const { ids = [], eventId } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "Provide attendee ids" });
+    }
+
+    const event = await requireOrganizerEvent(req.admin._id, eventId);
+    const attendees = await Registration.find({
+      _id: { $in: ids },
+      event: event._id,
+    });
+
+    const results = [];
+
+    for (const attendee of attendees) {
+      attendee.status = "rejected";
+      attendee.isApproved = false;
+      pushStatusHistory(attendee, "rejected", "Bulk rejection");
+      await attendee.save();
+
+      let emailSent = false;
+      let emailError = null;
+
+      const emailResult = await sendEventRejectionEmail(attendee, event);
+      emailSent = emailResult.sent;
+      emailError = emailResult.sent ? null : emailResult.reason;
+
+      results.push({
+        id: attendee._id,
+        emailSent,
+        emailError,
+      });
+    }
+
+    res.json({
+      message: `Rejected ${attendees.length} attendee(s)`,
+      results,
     });
   } catch (err) {
     const status = err.statusCode || 500;
