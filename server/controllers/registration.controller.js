@@ -4,7 +4,7 @@ import PDFDocument from "pdfkit";
 import Registration from "../models/Registration.js";
 import Event from "../models/Event.js";
 import { normalizeSlug, requireOrganizerEvent } from "../utils/eventSetup.js";
-import { applyAutoClose } from "../utils/eventStatus.js";
+import { applyAutoClose, applyQuotaClose } from "../utils/eventStatus.js";
 import { sendEventApprovalEmail, sendEventRejectionEmail } from "../services/email.service.js";
 import { buildTicketCode } from "../utils/helpers.js";
 
@@ -74,9 +74,22 @@ export const registerUser = async (req, res) => {
     await applyAutoClose(event);
 
     if (!event.publicInviteEnabled) {
-      return abort(403, {
-        message: "This event is not accepting public registrations",
-      });
+      const storedCode = (event.accessCode || "").trim();
+      const incomingCode = (req.body.accessCode || "").trim();
+
+      if (!storedCode || !incomingCode) {
+        return abort(403, {
+          message: "Access code required for this event",
+          code: "ACCESS_CODE_REQUIRED",
+        });
+      }
+
+      if (storedCode !== incomingCode) {
+        return abort(403, {
+          message: "Access code does not match",
+          code: "ACCESS_CODE_INVALID",
+        });
+      }
     }
 
     if (!event.isRegistrationOpen) {
@@ -201,6 +214,10 @@ export const registerUser = async (req, res) => {
       ],
     });
     registrationCreated = true;
+
+    const updatedMainCount = mainCount + (slotType === "main" ? 1 : 0);
+    const updatedOverflowCount = overflowCount + (slotType === "overflow" ? 1 : 0);
+    await applyQuotaClose(event, { mainUsed: updatedMainCount, overflowUsed: updatedOverflowCount });
 
     if (isApproved) {
       const emailResult = await sendEventApprovalEmail(registration, event);

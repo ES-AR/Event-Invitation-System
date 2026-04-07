@@ -14,6 +14,7 @@ import {
   bulkDelete,
   deleteAttendee,
   exportAttendeesCsv,
+  exportAttendeesPdf,
   rejectAttendee,
   fetchAttendees,
 } from "../../services/registration.service";
@@ -63,6 +64,7 @@ export default function RegistrationsPage() {
   const initialEventId = searchParams.get("eventId") || "";
   const [selectedEventId, setSelectedEventId] = useState(initialEventId);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [actionState, setActionState] = useState({});
 
   const selectedEvent = useMemo(() => events.find((event) => event.id === selectedEventId), [events, selectedEventId]);
 
@@ -126,18 +128,45 @@ export default function RegistrationsPage() {
   }, [data]);
 
   const approve = async (id) => {
-    await approveAttendee(id, token);
-    load({ page });
+    setActionState((prev) => ({ ...prev, [id]: "approve" }));
+    try {
+      await approveAttendee(id, token);
+      load({ page });
+    } finally {
+      setActionState((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
   };
 
   const remove = async (id) => {
-    await deleteAttendee(id, token);
-    load({ page });
+    setActionState((prev) => ({ ...prev, [id]: "delete" }));
+    try {
+      await deleteAttendee(id, token);
+      load({ page });
+    } finally {
+      setActionState((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
   };
 
   const reject = async (id) => {
-    await rejectAttendee(id, token);
-    load({ page });
+    setActionState((prev) => ({ ...prev, [id]: "reject" }));
+    try {
+      await rejectAttendee(id, token);
+      load({ page });
+    } finally {
+      setActionState((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
   };
 
   const handleExportCsv = async () => {
@@ -148,6 +177,19 @@ export default function RegistrationsPage() {
     const link = document.createElement("a");
     link.href = url;
     link.download = "approved-attendees.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPdf = async () => {
+    if (!token || !selectedEventId) return;
+    const pdfBlob = await exportAttendeesPdf({ eventId: selectedEventId, status: "approved" }, token);
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "approved-attendees.pdf";
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -222,6 +264,9 @@ export default function RegistrationsPage() {
         <div className="flex gap-3">
           <Button variant="secondary" onClick={handleExportCsv} disabled={!selectedEventId || loading}>
             Export CSV
+          </Button>
+          <Button variant="secondary" onClick={handleExportPdf} disabled={!selectedEventId || loading}>
+            Export PDF
           </Button>
         </div>
       </div>
@@ -330,6 +375,7 @@ export default function RegistrationsPage() {
                     const photoSrc = buildPhotoUrl(attendee.photoUrl);
                     const initials = initialsFromName(attendee.fullName);
                     const isSelected = selectedIds.includes(attendee._id);
+                    const actionInFlight = actionState[attendee._id];
                     return (
                       <div
                         key={attendee._id}
@@ -371,25 +417,30 @@ export default function RegistrationsPage() {
                         <p className="flex-1 text-sm text-slate-600">{attendee.organization || attendee.jobTitle || " "}</p> {/*for additional note for feature dev*/}
                         <div className="flex flex-wrap gap-3">
                           <button
-                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={() => approve(attendee._id)}
-                            disabled={attendee.status === "approved"}
+                            disabled={attendee.status === "approved" || Boolean(actionInFlight)}
                           >
-                            <CheckCircle2 className="h-4 w-4" strokeWidth={1.8} /> Approve
+                            <CheckCircle2 className="h-4 w-4" strokeWidth={1.8} />
+                            {actionInFlight === "approve" ? "Approving..." : "Approve"}
                           </button>
                           {attendee.status === "rejected" ? (
                             <button
-                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-danger/40 px-3 py-2 text-sm font-semibold text-danger"
+                              className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-danger/40 px-3 py-2 text-sm font-semibold text-danger disabled:cursor-not-allowed disabled:opacity-50"
                               onClick={() => remove(attendee._id)}
+                              disabled={Boolean(actionInFlight)}
                             >
-                              <Trash2 className="h-4 w-4" strokeWidth={1.8} /> Delete
+                              <Trash2 className="h-4 w-4" strokeWidth={1.8} />
+                              {actionInFlight === "delete" ? "Deleting..." : "Delete"}
                             </button>
                           ) : (
                             <button
-                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-amber-300/60 px-3 py-2 text-sm font-semibold text-amber-700"
+                              className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-amber-300/60 px-3 py-2 text-sm font-semibold text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                               onClick={() => reject(attendee._id)}
+                              disabled={Boolean(actionInFlight)}
                             >
-                              <XCircle className="h-4 w-4" strokeWidth={1.8} /> Reject
+                              <XCircle className="h-4 w-4" strokeWidth={1.8} />
+                              {actionInFlight === "reject" ? "Rejecting..." : "Reject"}
                             </button>
                           )}
                         </div>

@@ -10,28 +10,28 @@ export default function PublicShell() {
             <TicketCheck className="h-7 w-7" strokeWidth={1.6} />
           </div>
           <div className="leading-tight">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-600">EventHub</p>
-            <p className="font-display text-xl text-slate-900">Quota Suite</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-600">QEICS</p>
+            {/* <p className="font-display text-xl text-slate-900">Quota Suite</p> */}
           </div>
         </Link>
-        <div className="flex items-center gap-3 text-sm text-slate-500">
+        {/* <div className="flex items-center gap-3 text-sm text-slate-500">
           <span className="hidden sm:inline">Need help?</span>
           <a href="mailto:support@eventhub.com" className="rounded-full border border-slate-200 px-4 py-2 font-medium text-slate-700">
             support@eventhub.com
           </a>
-        </div>
+        </div> */}
       </header>
       <main className="pb-16">
         <Outlet />
       </main>
       <footer className="border-t border-slate-100 bg-white/70 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} EventHub Suite. All rights reserved.</p>
-          <div className="flex gap-4">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-center">
+          <p>© {new Date().getFullYear()} QEICS. All rights reserved.</p>
+          {/* <div className="flex gap-4">
             <a href="#privacy">Privacy</a>
             <a href="#terms">Terms</a>
             <a href="#accessibility">Accessibility</a>
-          </div>
+          </div> */}
         </div>
       </footer>
     </div>

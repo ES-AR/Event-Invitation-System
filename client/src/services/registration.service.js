@@ -69,3 +69,12 @@ export function exportAttendeesCsv(params = {}, token) {
   });
 }
 
+export function exportAttendeesPdf(params = {}, token) {
+  return apiClient("/registration/export/pdf", {
+    query: params,
+    token,
+    headers: { Accept: "application/pdf" },
+    responseType: "blob",
+  });
+}
+

@@ -6,7 +6,7 @@ import {
   normalizeSlug,
   requireOrganizerEvent,
 } from "../utils/eventSetup.js";
-import { applyAutoClose } from "../utils/eventStatus.js";
+import { applyAutoClose, applyQuotaClose } from "../utils/eventStatus.js";
 import { createCheckInToken } from "../utils/helpers.js";
 
 const editableFields = [
@@ -22,6 +22,7 @@ const editableFields = [
   "timezone",
   "bannerUrl",
   "publicInviteEnabled",
+  "accessCode",
   "registrationClosesAt",
   "autoCloseOnExpire",
   "maxMainSlots",
@@ -41,7 +42,10 @@ const editableFields = [
 
 const FRONTEND_ORIGIN = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
 
-const serializeEvent = (event, { includeShareUrl = true, includeCheckInMeta = true, quota } = {}) => {
+const serializeEvent = (
+  event,
+  { includeShareUrl = true, includeCheckInMeta = true, includeAccessCode = true, quota } = {}
+) => {
   const serialized = {
     id: event._id?.toString?.(),
     title: event.title,
@@ -57,6 +61,7 @@ const serializeEvent = (event, { includeShareUrl = true, includeCheckInMeta = tr
     bannerUrl: event.bannerUrl,
     publicSlug: event.publicSlug,
     publicInviteEnabled: event.publicInviteEnabled,
+    accessCode: event.accessCode,
     registrationClosesAt: event.registrationClosesAt,
     autoCloseOnExpire: event.autoCloseOnExpire,
     maxMainSlots: event.maxMainSlots,
@@ -91,6 +96,10 @@ const serializeEvent = (event, { includeShareUrl = true, includeCheckInMeta = tr
 
   if (quota) {
     serialized.quota = quota;
+  }
+
+  if (!includeAccessCode) {
+    delete serialized.accessCode;
   }
 
   return serialized;
@@ -270,6 +279,8 @@ export const getEventStats = async (req, res) => {
       Registration.countDocuments({ event: event._id, slotType: "overflow", status: activeSlotFilter }),
     ]);
 
+    await applyQuotaClose(event, { mainUsed: mainCount, overflowUsed: overflowCount });
+
     res.json({
       event: serializeEvent(event),
       totals: {
@@ -308,7 +319,29 @@ export const getPublicEvent = async (req, res) => {
     await applyAutoClose(event);
 
     if (!event.publicInviteEnabled) {
-      return res.status(403).json({ message: "This event is not accepting public registrations" });
+      const storedCode = (event.accessCode || "").trim();
+      const incomingCode = (req.query.accessCode || "").trim();
+
+      if (!storedCode) {
+        return res.status(403).json({
+          message: "Access code required for this event",
+          code: "ACCESS_CODE_REQUIRED",
+        });
+      }
+
+      if (!incomingCode) {
+        return res.status(403).json({
+          message: "Access code required for this event",
+          code: "ACCESS_CODE_REQUIRED",
+        });
+      }
+
+      if (storedCode !== incomingCode) {
+        return res.status(403).json({
+          message: "Access code does not match",
+          code: "ACCESS_CODE_INVALID",
+        });
+      }
     }
 
     const activeFilter = { status: { $ne: "cancelled" } };
@@ -316,6 +349,8 @@ export const getPublicEvent = async (req, res) => {
       Registration.countDocuments({ event: event._id, slotType: "main", ...activeFilter }),
       Registration.countDocuments({ event: event._id, slotType: "overflow", ...activeFilter }),
     ]);
+
+    await applyQuotaClose(event, { mainUsed, overflowUsed });
 
     const quota = {
       main: {
@@ -331,7 +366,12 @@ export const getPublicEvent = async (req, res) => {
     };
 
     res.json({
-      event: serializeEvent(event, { includeShareUrl: false, includeCheckInMeta: false, quota }),
+      event: serializeEvent(event, {
+        includeShareUrl: false,
+        includeCheckInMeta: false,
+        quota,
+        includeAccessCode: false,
+      }),
     });
   } catch (error) {
     console.error("Error fetching public event:", error);

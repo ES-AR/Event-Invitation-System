@@ -21,6 +21,7 @@ const eventSchema = new mongoose.Schema(
 
     publicSlug: { type: String, default: "main-event", unique: true },
     publicInviteEnabled: { type: Boolean, default: true },
+    accessCode: { type: String, default: "" },
 
     registrationClosesAt: { type: Date, default: null },
     autoCloseOnExpire: { type: Boolean, default: false },

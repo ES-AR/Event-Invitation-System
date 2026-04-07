@@ -482,13 +482,16 @@ export default function CheckInPage() {
               }, {
                 label: "Phone",
                 value: activeAttendee?.phone || "—",
-              }, {
-                label: "Organization",
-                value: activeAttendee?.organization || "Not provided",
-              }, {
-                label: "Quota",
-                value: quotaSummary,
-              }].map((field) => (
+              }
+              // , {
+              //   label: "Organization",
+              //   value: activeAttendee?.organization || "Not provided",
+              // }, 
+              // {
+              //   label: "Quota",
+              //   value: quotaSummary,
+              // }
+            ].map((field) => (
                 <div key={field.label} className="rounded-2xl border border-white/10 bg-black/30 p-4">
                   <p className="text-xs uppercase tracking-[0.4em] text-slate-500">{field.label}</p>
                   <p className="mt-2 text-base text-white">{field.value}</p>

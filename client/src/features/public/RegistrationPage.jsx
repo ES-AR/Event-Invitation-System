@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
-  Briefcase,
+  // Briefcase,
   CalendarClock,
   CheckCircle2,
   Mail,
@@ -26,13 +26,13 @@ const initialForm = {
   lastName: "",
   email: "",
   phone: "",
-  jobTitle: "",
+  // jobTitle: "",
 };
 
 const trustPoints = [
-  "Duplicate detection keeps your invite unique.",
+  "There is Duplicate detection, keeps your invite unique.",
   "Hosts may approve RSVP before sharing directions.",
-  "Photo ID is captured with your RSVP so approvals move faster.",
+  "Ticket is captured with your RSVP so approvals move faster.",
 ];
 
 export default function RegistrationPage() {
@@ -48,6 +48,9 @@ export default function RegistrationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
+  const [accessCode, setAccessCode] = useState("");
+  const [accessGate, setAccessGate] = useState(false);
+  const [accessError, setAccessError] = useState("");
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
 
@@ -57,24 +60,45 @@ export default function RegistrationPage() {
 
   useEffect(() => {
     let isMounted = true;
-    async function load() {
+    let pollTimer;
+    async function load({ silent = false } = {}) {
+      if (!silent) {
+        setLoading(true);
+      }
+      setAccessGate(false);
+      setAccessError("");
       try {
-        const { event: eventData } = await getPublicEvent(slug);
+        const { event: eventData } = await getPublicEvent(slug, accessCode.trim());
         if (isMounted) {
           setEvent(eventData);
           setError(null);
         }
       } catch (err) {
-        setError(err.message || "Unable to load event");
+        const payloadCode = err.payload?.code;
+        if (err.status === 403 && (payloadCode === "ACCESS_CODE_REQUIRED" || payloadCode === "ACCESS_CODE_INVALID")) {
+          if (isMounted) {
+            setAccessGate(true);
+            setAccessError(payloadCode === "ACCESS_CODE_INVALID" ? err.message : "");
+            setError(null);
+          }
+        } else if (isMounted) {
+          setError(err.message || "Unable to load event");
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
     }
     load();
+    pollTimer = setInterval(() => {
+      load({ silent: true });
+    }, 20000);
     return () => {
       isMounted = false;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+      }
     };
-  }, [slug]);
+  }, [slug, accessCode]);
 
   const tierPill = useMemo(() => {
     if (!event) return null;
@@ -99,6 +123,33 @@ export default function RegistrationPage() {
     const nextPreview = URL.createObjectURL(file);
     setPhotoFile(file);
     setPhotoPreview(nextPreview);
+  };
+
+  const handleAccessSubmit = async (e) => {
+    e.preventDefault();
+    if (!accessCode.trim()) {
+      setAccessError("Enter the access code shared by the organizer.");
+      return;
+    }
+    setLoading(true);
+    setAccessError("");
+    try {
+      const { event: eventData } = await getPublicEvent(slug, accessCode.trim());
+      setEvent(eventData);
+      setAccessGate(false);
+      setError(null);
+    } catch (err) {
+      const payloadCode = err.payload?.code;
+      if (err.status === 403 && payloadCode === "ACCESS_CODE_INVALID") {
+        setAccessError(err.message || "Access code does not match");
+      } else if (err.status === 403 && payloadCode === "ACCESS_CODE_REQUIRED") {
+        setAccessError("Enter the access code shared by the organizer.");
+      } else {
+        setError(err.message || "Unable to load event");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -128,25 +179,34 @@ export default function RegistrationPage() {
   const overflowHasRoom = overflowRemaining > 0;
   const mainCapacityConfigured = (event?.maxMainSlots ?? quotaStats.main?.capacity ?? 0) > 0;
   const mainFull = mainCapacityConfigured && mainRemaining <= 0;
+  const registrationClosed = Boolean(event && !event.isRegistrationOpen);
+  const closeReason = event?.closeReason?.trim() || "Registration is currently closed.";
   const waitlistOfferActive = !isOverflowView && mainFull && overflowConfigured && overflowHasRoom;
   const waitlistUnavailable = mainFull && (!overflowConfigured || !overflowHasRoom);
   const overflowClosed = isOverflowView && (!overflowConfigured || !overflowHasRoom);
   const submitDisabled =
-    submitting || (!isOverflowView && waitlistUnavailable) || overflowClosed;
-  const submitLabel = !isOverflowView && waitlistUnavailable
-    ? "Registration full"
-    : overflowClosed
-      ? "Waitlist full"
-      : submitting
-        ? "Submitting..."
-        : isOverflowView
-          ? "Join overflow waitlist"
-          : "Request my invite";
+    registrationClosed || submitting || (!isOverflowView && waitlistUnavailable) || overflowClosed;
+  const submitLabel = registrationClosed
+    ? "Registration closed"
+    : !isOverflowView && waitlistUnavailable
+      ? "Registration full"
+      : overflowClosed
+        ? "Waitlist full"
+        : submitting
+          ? "Submitting..."
+          : isOverflowView
+            ? "Join overflow waitlist"
+            : "Request my invite";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!event) {
       setError("Event details are still loading. Try again.");
+      return;
+    }
+
+    if (registrationClosed) {
+      setError(closeReason);
       return;
     }
 
@@ -195,11 +255,14 @@ export default function RegistrationPage() {
       formData.append("fullName", `${form.firstName} ${form.lastName}`.trim());
       formData.append("email", form.email);
       formData.append("phone", form.phone);
-      formData.append("jobTitle", form.jobTitle);
+      // formData.append("jobTitle", form.jobTitle);
       formData.append("slug", slug || event?.publicSlug);
       formData.append("ticketTier", isOverflowView ? "Overflow" : "Main");
       formData.append("dietaryRestrictions", "None");
       formData.append("note", "");
+      if (accessCode.trim()) {
+        formData.append("accessCode", accessCode.trim());
+      }
       formData.append("photo", photoFile);
       const { message, registration } = await submitRegistration(formData);
       setStatus({ message, registration });
@@ -220,6 +283,34 @@ export default function RegistrationPage() {
     );
   }
 
+  if (accessGate) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-16">
+        <Card className="space-y-6 border border-slate-200 bg-white p-8">
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Private invite</p>
+            <h2 className="font-display text-2xl text-slate-900">Enter access code</h2>
+            <p className="text-sm text-slate-500">This event is private. Use the access code provided by the organizer.</p>
+          </div>
+          <form onSubmit={handleAccessSubmit} className="space-y-4">
+            <Input
+              label="Access code"
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value)}
+              placeholder="VIP2026"
+              required
+              error={accessError || undefined}
+            />
+            {error && <p className="text-sm font-semibold text-danger">{error}</p>}
+            <Button type="submit" className="w-full justify-center" disabled={loading}>
+              {loading ? "Checking..." : "Unlock invite"}
+            </Button>
+          </form>
+        </Card>
+      </div>
+    );
+  }
+
   if (status) {
     const suffix = isOverflowView ? "?tier=overflow" : "";
     const inviteUrl = typeof window !== "undefined" && event?.publicSlug
@@ -234,7 +325,7 @@ export default function RegistrationPage() {
           <h2 className="mt-4 text-3xl font-semibold">Thanks, {status.registration?.fullName}!</h2>
           <p className="mt-2 text-sm text-white/80">{status.message}</p>
           <p className="text-xs text-white/70">If your event requires approval, the full details will arrive via email as soon as a host reviews your RSVP.</p>
-          <div className="mt-8 grid gap-4 text-sm">
+          {/* <div className="mt-8 grid gap-4 text-sm">
             <div className="rounded-2xl border border-white/20 bg-white/10 p-4">
               <p className="font-semibold">Invite link</p>
               <p className="text-white/70">{inviteUrl}</p>
@@ -242,7 +333,7 @@ export default function RegistrationPage() {
             <Button onClick={() => window.print()} variant="secondary" className="bg-white text-slate-900">
               Save confirmation
             </Button>
-          </div>
+          </div> */}
         </Card>
       </div>
     );
@@ -284,7 +375,7 @@ export default function RegistrationPage() {
               </div>
               <div>
                 <p className="uppercase text-white/60">Arrival notes</p>
-                <p>{event?.badgeMessaging || "Bring valid ID for entry."}</p>
+                <p>{event?.checkInInstructions || event?.badgeMessaging || "Bring valid ID for entry."}</p>
               </div>
             </div>
           </article>
@@ -299,60 +390,15 @@ export default function RegistrationPage() {
               />
             </Card>
           )}
-
-          <Card className="space-y-5 border border-slate-100/80 bg-white/95 p-6">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-slate-400">
-              <Ticket className="h-4 w-4" /> Availability
-            </div>
-            <div className="space-y-4">
-              {visibleTierData?.capacity ? (
-                <div>
-                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-slate-500">
-                    <span>{isOverflowView ? "Overflow quota" : "Main quota"}</span>
-                    <span>
-                      {visibleTierData.used}/{visibleTierData.capacity}
-                    </span>
-                  </div>
-                  <div className="mt-2 h-2 rounded-full bg-slate-200">
-                    <div
-                      className={`h-full rounded-full ${isOverflowView ? "bg-amber-500" : "bg-primary-500"}`}
-                      style={{ width: `${visibleTierData.percent}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">{Math.max(visibleTierData.remaining ?? 0, 0)} spots left</p>
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">
-                  {isOverflowView ? "Overflow" : "Main"} quota not configured.
-                </p>
-              )}
-              {!isOverflowView && quotaStats.overflow?.capacity > 0 && (
-                <p className="text-xs text-slate-500">
-                  Overflow seats live at a separate link once the main quota fills.
-                </p>
-              )}
-              {isOverflowView && quotaStats.main?.remaining > 0 && (
-                <p className="text-xs font-semibold text-amber-600">
-                  Main quota still has {quotaStats.main.remaining} spots. Hosts typically reserve overflow for later waves.
-                </p>
-              )}
-            </div>
-          </Card>
-
-          <Card className="space-y-4 border border-slate-100 bg-white/95 p-6">
-            <p className="text-sm font-semibold text-slate-800">Before you submit</p>
-            <ul className="space-y-3 text-sm text-slate-600">
-              {trustPoints.map((point) => (
-                <li key={point} className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary-500" strokeWidth={2} />
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
         </section>
 
         <section className="flex-1 space-y-6">
+          {registrationClosed && (
+            <Card className="border border-slate-200 bg-slate-50 p-5 text-slate-700">
+              <p className="text-sm font-semibold text-slate-900">Registration closed</p>
+              <p className="mt-2 text-sm">{closeReason}</p>
+            </Card>
+          )}
           {waitlistOfferActive && (
             <Card className="border border-amber-200 bg-amber-50 p-5 text-amber-900">
               <p className="text-sm font-semibold text-amber-900">Main registration is full.</p>
@@ -448,13 +494,13 @@ export default function RegistrationPage() {
                 placeholder="+234 803 000 0000"
                 hint="Include country code (e.g. +234...)"
               />
-              <Input
+              {/* <Input
                 label="Role or title"
                 icon={<Briefcase className="h-4 w-4" strokeWidth={1.8} />}
                 value={form.jobTitle}
                 onChange={(e) => handleChange("jobTitle", e.target.value)}
                 hint="Optional"
-              />
+              /> */}
             </div>
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-5 text-sm">
               <p className="flex items-center gap-2 font-semibold text-slate-700">
@@ -488,8 +534,57 @@ export default function RegistrationPage() {
               {submitLabel}
             </Button>
           </form>
+                    <Card className="space-y-5 border border-slate-100/80 bg-white/95 p-6">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-slate-400">
+              <Ticket className="h-4 w-4" /> Availability
+            </div>
+            <div className="space-y-4">
+              {visibleTierData?.capacity ? (
+                <div>
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-slate-500">
+                    <span>{isOverflowView ? "Overflow quota" : "Main quota"}</span>
+                    <span>
+                      {visibleTierData.used}/{visibleTierData.capacity}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-slate-200">
+                    <div
+                      className={`h-full rounded-full ${isOverflowView ? "bg-amber-500" : "bg-primary-500"}`}
+                      style={{ width: `${visibleTierData.percent}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">{Math.max(visibleTierData.remaining ?? 0, 0)} spots left</p>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  {isOverflowView ? "Overflow" : "Main"} quota not configured.
+                </p>
+              )}
+              {!isOverflowView && quotaStats.overflow?.capacity > 0 && (
+                <p className="text-xs text-slate-500">
+                  Overflow seats live at a separate link once the main quota fills.
+                </p>
+              )}
+              {isOverflowView && quotaStats.main?.remaining > 0 && (
+                <p className="text-xs font-semibold text-amber-600">
+                  Main quota still has {quotaStats.main.remaining} spots. Hosts typically reserve overflow for later waves.
+                </p>
+              )}
+            </div>
+          </Card>
         </section>
       </div>
+          <Card className="space-y-4 border border-slate-100 bg-white/95 p-6">
+            <p className="text-sm font-semibold text-slate-800">Before you submit</p>
+            <ul className="space-y-3 text-sm text-slate-600">
+              {trustPoints.map((point) => (
+                <li key={point} className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary-500" strokeWidth={2} />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
     </div>
   );
 }

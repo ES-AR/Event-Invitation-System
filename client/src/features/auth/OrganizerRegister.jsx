@@ -48,7 +48,7 @@ export default function OrganizerRegister() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <section className="flex flex-col justify-between bg-primary-900 px-10 py-12 text-white">
+      <section className="flex flex-col justify-between bg-primary-900 px-10 py-12 text-white bg-[url('https://i.pinimg.com/736x/39/14/64/3914640839f31b30a16106ef73183e6f.jpg')] bg-cover bg-center">
         <div>
           <p className="text-xs uppercase tracking-[0.35em] text-white/70">EventQuota</p>
           <h1 className="mt-4 font-display text-4xl">Start inviting in minutes</h1>
@@ -73,7 +73,7 @@ export default function OrganizerRegister() {
         </ul>
       </section>
       <section className="flex items-center bg-white px-8 py-12">
-        <form onSubmit={handleSubmit} className="w-full max-w-md space-y-5">
+        <form onSubmit={handleSubmit} className="w-full max-w-md space-y-5 mx-auto">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">New organizer</p>
             <h2 className="mt-2 font-display text-3xl text-slate-900">Create your account</h2>

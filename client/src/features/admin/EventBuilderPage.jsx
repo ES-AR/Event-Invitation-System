@@ -53,8 +53,11 @@ const defaultEvent = {
   allowWalkIns: false,
   registrationClosesAt: "",
   registrationClosesTime: "",
+  autoCloseOnExpire: false,
   publicSlug: "",
   publicInviteEnabled: true,
+  accessCode: "",
+  badgeMessaging: "",
   checkInInstructions: "",
   contactEmail: "",
   timezone: localTimeZone,
@@ -142,6 +145,10 @@ const hydrateForm = (event = defaultEvent) => {
   return {
     ...defaultEvent,
     ...event,
+    publicInviteEnabled: Boolean(event.publicInviteEnabled ?? true),
+    autoCloseOnExpire: Boolean(event.autoCloseOnExpire ?? false),
+    accessCode: event.accessCode || "",
+    badgeMessaging: event.badgeMessaging || "",
     locationLatitude: event.locationLatitude ?? null,
     locationLongitude: event.locationLongitude ?? null,
     timezone: timeZone,
@@ -337,6 +344,8 @@ export default function EventBuilderPage() {
 
     const builtPayload = {
       ...payload,
+      publicInviteEnabled: Boolean(payload.publicInviteEnabled),
+      autoCloseOnExpire: Boolean(payload.autoCloseOnExpire),
       timezone: resolvedTimeZone,
       startDate: combineDateTime(payload.startDate, startTime, resolvedTimeZone),
       endDate: combineDateTime(payload.endDate, endTime, resolvedTimeZone),
@@ -667,7 +676,7 @@ export default function EventBuilderPage() {
             </Card>
             <Card className="space-y-4">
               <p className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
-                <SlidersHorizontal className="h-4 w-4 text-primary-600" strokeWidth={1.8} /> Registration Logic
+                <SlidersHorizontal className="h-4 w-4 text-primary-600" strokeWidth={1.8} /> Registration Type
               </p>
               <label className="flex items-center gap-3 text-sm text-slate-600">
                 <input
@@ -677,18 +686,27 @@ export default function EventBuilderPage() {
                 />
                 Require manual approval
               </label>
-              <label className="flex items-center gap-3 text-sm text-slate-600">
+              {/* <label className="flex items-center gap-3 text-sm text-slate-600">
                 <input type="checkbox" checked={form.allowWalkIns} onChange={(e) => handleChange("allowWalkIns", e.target.checked)} />
                 Allow walk-ins when capacity allows
-              </label>
+              </label> */}
               <label className="flex items-center gap-3 text-sm text-slate-600">
                 <input
                   type="checkbox"
-                  checked={form.publicInviteEnabled}
+                  checked={Boolean(form.publicInviteEnabled)}
                   onChange={(e) => handleChange("publicInviteEnabled", e.target.checked)}
                 />
                 Public invite link enabled
               </label>
+              {!Boolean(form.publicInviteEnabled) && (
+                <Input
+                  label="Private access code"
+                  value={form.accessCode || ""}
+                  onChange={(e) => handleChange("accessCode", e.target.value)}
+                  hint="Share this code with invitees to unlock the RSVP form."
+                  required
+                />
+              )}
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
                   label="Registration closes on"
@@ -703,6 +721,14 @@ export default function EventBuilderPage() {
                   onChange={(e) => handleChange("registrationClosesTime", e.target.value)}
                 />
               </div>
+              <label className="flex items-center gap-3 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.autoCloseOnExpire)}
+                  onChange={(e) => handleChange("autoCloseOnExpire", e.target.checked)}
+                />
+                Auto-close registration at this time
+              </label>
             </Card>
           </div>
 
@@ -710,6 +736,12 @@ export default function EventBuilderPage() {
             <p className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
               <ShieldCheck className="h-4 w-4 text-primary-600" strokeWidth={1.8} /> Guest guidance
             </p>
+            <Input
+              label="Arrival notes"
+              value={form.badgeMessaging || ""}
+              onChange={(e) => handleChange("badgeMessaging", e.target.value)}
+              hint="Shown on the invite page next to arrival notes."
+            />
             <label className="text-sm font-medium text-slate-700">
               Arrival instructions for staff/guests
               <textarea

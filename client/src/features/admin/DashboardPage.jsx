@@ -12,7 +12,7 @@ import { formatDateRange } from "../../utils/formatters";
 const statConfig = [
   { key: "approved", label: "Approved RSVPs", icon: UserCheck },
   { key: "pending", label: "Pending Reviews", icon: Clock9 },
-  { key: "cancelled", label: "Cancelled", icon: UserX },
+  { key: "rejected", label: "Rejected", icon: UserX },
 ];
 
 export default function DashboardPage() {
@@ -30,9 +30,11 @@ export default function DashboardPage() {
     [events, selectedEventId]
   );
 
-  const loadEvents = useCallback(async () => {
+  const loadEvents = useCallback(async ({ silent = false } = {}) => {
     if (!token) return;
-    setEventsLoading(true);
+    if (!silent) {
+      setEventsLoading(true);
+    }
     try {
       const response = await listEvents(token);
       const eventList = response.events || [];
@@ -46,12 +48,23 @@ export default function DashboardPage() {
     } catch (err) {
       console.error("Failed to load events", err);
     } finally {
-      setEventsLoading(false);
+      if (!silent) {
+        setEventsLoading(false);
+      }
     }
   }, [token]);
 
   useEffect(() => {
+    let pollTimer;
     loadEvents();
+    pollTimer = setInterval(() => {
+      loadEvents({ silent: true });
+    }, 20000);
+    return () => {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+      }
+    };
   }, [loadEvents]);
 
   useEffect(() => {
@@ -61,18 +74,31 @@ export default function DashboardPage() {
     }
 
     let active = true;
-    setStatsLoading(true);
-    getEventStats(selectedEventId, token)
-      .then((response) => {
+    let pollTimer;
+    const loadStats = async ({ silent = false } = {}) => {
+      if (!silent) {
+        setStatsLoading(true);
+      }
+      try {
+        const response = await getEventStats(selectedEventId, token);
         if (active) setStats(response);
-      })
-      .catch((err) => console.error("Failed to load stats", err))
-      .finally(() => {
-        if (active) setStatsLoading(false);
-      });
+      } catch (err) {
+        console.error("Failed to load stats", err);
+      } finally {
+        if (active && !silent) setStatsLoading(false);
+      }
+    };
+
+    loadStats();
+    pollTimer = setInterval(() => {
+      loadStats({ silent: true });
+    }, 20000);
 
     return () => {
       active = false;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+      }
     };
   }, [token, selectedEventId]);
 

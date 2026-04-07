@@ -95,12 +95,6 @@ const testimonials = [
   },
 ];
 
-const highlights = [
-  "Unlimited event templates",
-  "Auto-approval rules",
-  "Overflow waitlist routing",
-  "Guest badge exports",
-];
 
 export default function LandingPage() {
   return (
@@ -110,7 +104,7 @@ export default function LandingPage() {
           <div className="absolute -left-24 top-6 h-56 w-56 rounded-full bg-[radial-gradient(circle_at_center,_rgba(45,212,191,0.65),rgba(11,18,32,0))] blur-2xl" />
           <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-[radial-gradient(circle_at_center,_rgba(244,114,182,0.45),rgba(11,18,32,0))] blur-3xl" />
         </div>
-        <div className="relative grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="relative">
           <div className="flex flex-col gap-6">
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs uppercase tracking-[0.35em] text-white/70">
               Event Invitation System
@@ -131,13 +125,6 @@ export default function LandingPage() {
                 Log in
               </Button>
             </div>
-            <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/70">
-              {highlights.map((item) => (
-                <span key={item} className="rounded-full border border-white/15 bg-white/5 px-4 py-2">
-                  {item}
-                </span>
-              ))}
-            </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
               {heroStats.map((stat) => (
                 <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -146,37 +133,6 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
-          </div>
-          <div className="grid gap-4">
-            <Card className="relative overflow-hidden border border-white/10 bg-white/10 p-6 text-white">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" aria-hidden="true" />
-              <div className="relative">
-                <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-white/60">
-                  <span>Live preview</span>
-                  <Layers3 className="h-4 w-4" />
-                </div>
-                <div className="mt-6 rounded-3xl border border-white/10 bg-[#10192b] p-6">
-                  <p className="text-xs uppercase tracking-[0.3em] text-white/50">Tonight</p>
-                  <p className="mt-3 text-2xl font-semibold">Night Market Sessions</p>
-                  <p className="text-sm text-white/70">Chicago · 18 slots remaining</p>
-                  <div className="mt-5 grid gap-3 text-xs text-white/70">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="h-4 w-4 text-emerald-300" strokeWidth={1.8} /> Auto-approval enabled
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-cyan-200" strokeWidth={1.8} /> VIP badges ready
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-            <Card className="border border-slate-100 bg-white/95 p-6 text-slate-900">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Host advantage</p>
-              <p className="mt-3 text-xl font-semibold">One dashboard for every event type.</p>
-              <p className="mt-2 text-sm text-slate-600">
-                Launch pop-ups, ceremonies, meetups, and fundraisers with the same premium experience.
-              </p>
-            </Card>
           </div>
         </div>
       </section>
@@ -229,17 +185,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto grid w-full max-w-6xl gap-6 px-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <Card className="border border-slate-100 bg-gradient-to-br from-[#0f172a] via-[#0b3b5a] to-[#072f2d] p-8 text-white">
-          <p className="text-xs uppercase tracking-[0.4em] text-white/70">Launch faster</p>
-          <h3 className="mt-3 font-display text-3xl">Every invite feels curated and intentional.</h3>
-          <p className="mt-3 text-sm text-white/80">
-            Give guests a page that feels like a premium experience while keeping your approvals, limits, and check-ins effortless.
-          </p>
-          <Button as={Link} to="/invite/main-event" variant="secondary" className="mt-8 bg-white text-slate-900">
-            Preview a public invite
-          </Button>
-        </Card>
+      <section className="mx-auto w-full max-w-6xl space-y-8 px-6">
         <Card className="space-y-5 border border-slate-100 bg-white/95 p-8">
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.4em] text-slate-400">
             <span>Host stories</span>

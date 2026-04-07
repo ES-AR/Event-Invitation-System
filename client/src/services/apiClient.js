@@ -26,6 +26,8 @@ export async function apiClient(path, options = {}) {
     token,
     headers = {},
     isFormData = false,
+    responseType,
+    cache,
     signal,
   } = options;
 
@@ -60,10 +62,29 @@ export async function apiClient(path, options = {}) {
     method,
     headers: finalHeaders,
     body,
+    cache,
     signal,
   });
 
   const isJson = response.headers.get("content-type")?.includes("application/json");
+
+  if (responseType === "blob") {
+    if (!response.ok) {
+      let payload;
+      if (isJson) {
+        payload = await response.json();
+      } else {
+        payload = await response.text().catch(() => "");
+      }
+      const message = (isJson && payload?.message) || response.statusText || "Request failed";
+      const error = new Error(message);
+      error.status = response.status;
+      error.payload = payload;
+      throw error;
+    }
+    return response.blob();
+  }
+
   const payload = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {

@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
 import nodemailer from "nodemailer";
+import { fileURLToPath } from "url";
 
 const { GMAIL_USER, GMAIL_PASS, EMAIL_FROM, FRONTEND_URL } = process.env;
 
@@ -17,7 +18,10 @@ const transporter = gmailConfigured
   : null;
 
 const defaultOrigin = (FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
-const attendeeUploadsDir = path.join(process.cwd(), "server", "uploads", "attendees");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const attendeeUploadsDir = path.join(__dirname, "..", "uploads", "attendees");
+const legacyAttendeeUploadsDir = path.join(__dirname, "..", "server", "uploads", "attendees");
 
 const formatEventWindow = (event) => {
   if (!event?.startDate) {
@@ -81,7 +85,11 @@ const resolvePhotoPath = (photoUrl) => {
   if (!photoUrl) return null;
   const filename = path.basename(photoUrl);
   const candidate = path.join(attendeeUploadsDir, filename);
-  return fs.existsSync(candidate) ? candidate : null;
+  if (fs.existsSync(candidate)) {
+    return candidate;
+  }
+  const legacyCandidate = path.join(legacyAttendeeUploadsDir, filename);
+  return fs.existsSync(legacyCandidate) ? legacyCandidate : null;
 };
 
 const generateTicketPdf = (attendee, event) =>
@@ -131,7 +139,7 @@ const generateTicketPdf = (attendee, event) =>
       .fillColor("#0f172a")
       .text(`Slot: ${(attendee.slotType || "main").toUpperCase()} • Tier: ${attendee.ticketTier || "Main"}`)
       .fillColor("#475569")
-      .text(`Registration ID: ${attendee._id?.toString() || "N/A"}`);
+      .text(`Ticket Code: ${attendee.ticketCode || "N/A"}`);
 
     doc
       .moveDown(0.5)
@@ -219,7 +227,6 @@ export async function sendEventApprovalEmail(attendee, event) {
         <p><strong>Where:</strong> ${venueLine}</p>
         <p><strong>Address:</strong> ${addressLine}</p>
         ${mapLink ? `<p><strong>Map location:</strong> <a href="${mapLink}">Open in Google Maps</a></p>` : ""}
-        <p><strong>Invite link:</strong> <a href="${eventLink}">${eventLink}</a></p>
         ${contactLine ? `<p><strong>Host contact:</strong> ${contactLine}</p>` : ""}
         <hr style="margin:16px 0;border:none;border-top:1px solid #e2e8f0" />
         <p>We look forward to welcoming you.</p>

@@ -1,8 +1,11 @@
 import { apiClient } from "./apiClient";
 
-export function getPublicEvent(slug) {
+export function getPublicEvent(slug, accessCode) {
   const targetSlug = slug || import.meta.env.VITE_DEFAULT_EVENT_SLUG || "main-event";
-  return apiClient(`/event/public/${targetSlug}`);
+  return apiClient(`/event/public/${targetSlug}`, {
+    query: { accessCode },
+    cache: "no-store",
+  });
 }
 
 export function listEvents(token) {

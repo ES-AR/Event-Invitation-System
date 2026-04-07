@@ -15,7 +15,7 @@ export default function AdminShell() {
     <div className="flex min-h-screen bg-slate-50">
       <aside className="hidden w-64 flex-shrink-0 flex-col border-r border-slate-100 bg-white/80 px-6 py-8 lg:flex">
         <div className="mb-8">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">EventHub</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">QEICS</p>
           <p className="font-display text-2xl text-slate-900">Organizer</p>
         </div>
         <nav className="flex flex-1 flex-col gap-2">

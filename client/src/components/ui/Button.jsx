@@ -1,4 +1,4 @@
-const base = "inline-flex items-center justify-center rounded-xl font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+const base = "inline-flex cursor-pointer items-center justify-center rounded-xl font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
 
 const variants = {
   primary: "bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-soft hover:from-primary-600 hover:to-primary-700",
@@ -22,7 +22,7 @@ export default function Button({
   children,
   ...props
 }) {
-  const disabledStyles = props.disabled ? "opacity-60 pointer-events-none" : "";
+  const disabledStyles = props.disabled ? "opacity-60 pointer-events-none cursor-not-allowed" : "";
   const classes = [base, variants[variant], sizes[size], disabledStyles, className]
     .filter(Boolean)
     .join(" ");
