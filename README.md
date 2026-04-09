@@ -11,6 +11,17 @@ A MERN-based, quota-controlled event invitation and attendance platform with mai
 - Registration requires a photo upload so staff can visually verify attendees.
 - Export approved attendees to CSV (Excel friendly).
 - Security: rate limiting on registration plus duplicate email prevention.
+
+## Documentation
+For detailed system architecture and design documentation, please refer to the `docs/` directory:
+- [User Requirements](docs/user_requirements.md)
+- [Non-Functional Requirements](docs/non_functional_requirements.md)
+- [Use Case Diagram](docs/use_case_diagram.md)
+- [Use Case Descriptions](docs/use_case_descriptions.md)
+- [Behavioral Diagrams](docs/behavioral_diagrams.md)
+- [Structural Diagrams](docs/structural_diagrams.md)
+- [Database Design](docs/database_design.md)
+
 ## Running Locally
 1) **Backend**
 ```bash
